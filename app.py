@@ -1,0 +1,192 @@
+import json
+import os
+import random
+import sqlite3
+import uuid
+from datetime import datetime
+
+from flask import Flask, redirect, render_template, request, session, url_for
+from PIL import Image, ImageDraw, ImageFont
+
+import inspirations
+
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(APP_ROOT, "smiles.db")
+GENERATED_DIR = os.path.join(APP_ROOT, "static", "generated")
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SMILE_SECRET", "smile-secret-key")
+
+
+CATEGORIES = {
+    "actors": inspirations.ACTORS,
+    "activities": inspirations.ACTIVITIES,
+    "areas": inspirations.AREAS,
+    "accessories": inspirations.ACCESSORIES,
+}
+
+
+def get_connection():
+    connection = sqlite3.connect(DB_PATH)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def init_db() -> None:
+    os.makedirs(GENERATED_DIR, exist_ok=True)
+    with get_connection() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS items (
+                category TEXT NOT NULL,
+                name TEXT NOT NULL,
+                total_score INTEGER NOT NULL DEFAULT 0,
+                rating_count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (category, name)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rating INTEGER NOT NULL,
+                selections TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        for category, options in CATEGORIES.items():
+            for option in options:
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO items (category, name, total_score, rating_count)
+                    VALUES (?, ?, 0, 0)
+                    """,
+                    (category, option),
+                )
+
+
+def weighted_choice(category: str, options: list[str]) -> str:
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT name, total_score, rating_count FROM items WHERE category = ?",
+            (category,),
+        ).fetchall()
+    weights = []
+    names = []
+    row_map = {row["name"]: row for row in rows}
+    for option in options:
+        row = row_map.get(option)
+        if row and row["rating_count"] > 0:
+            average = row["total_score"] / row["rating_count"]
+        else:
+            average = 0
+        weight = 1 + average
+        names.append(option)
+        weights.append(weight)
+    return random.choices(names, weights=weights, k=1)[0]
+
+
+def generate_inspiration() -> dict[str, str]:
+    return {
+        "actors": weighted_choice("actors", inspirations.ACTORS),
+        "activities": weighted_choice("activities", inspirations.ACTIVITIES),
+        "areas": weighted_choice("areas", inspirations.AREAS),
+        "accessories": weighted_choice("accessories", inspirations.ACCESSORIES),
+    }
+
+
+def generate_image(selections: dict[str, str]) -> str:
+    width, height = 900, 520
+    background = (
+        random.randint(80, 200),
+        random.randint(80, 200),
+        random.randint(80, 200),
+    )
+    image = Image.new("RGB", (width, height), color=background)
+    draw = ImageDraw.Draw(image)
+
+    for index in range(10):
+        color = (
+            random.randint(0, 255),
+            random.randint(0, 255),
+            random.randint(0, 255),
+        )
+        x0 = random.randint(0, width - 50)
+        y0 = random.randint(0, height - 50)
+        x1 = x0 + random.randint(40, 180)
+        y1 = y0 + random.randint(40, 180)
+        draw.ellipse([x0, y0, x1, y1], fill=color, outline=(255, 255, 255))
+
+    title = "Your Smile Inspiration"
+    lines = [
+        f"Actor: {selections['actors']}",
+        f"Activity: {selections['activities']}",
+        f"Area: {selections['areas']}",
+        f"Accessory: {selections['accessories']}",
+    ]
+
+    font = ImageFont.load_default()
+    draw.text((30, 30), title, fill=(20, 20, 20), font=font)
+    y_offset = 80
+    for line in lines:
+        draw.text((40, y_offset), line, fill=(20, 20, 20), font=font)
+        y_offset += 40
+
+    unique_id = uuid.uuid4().hex
+    filename = f"smile_{unique_id}.png"
+    filepath = os.path.join(GENERATED_DIR, filename)
+    image.save(filepath, format="PNG")
+    return f"generated/{filename}"
+
+
+init_db()
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/generate", methods=["POST"])
+def generate():
+    selections = generate_inspiration()
+    image_path = generate_image(selections)
+    session["last_selection"] = selections
+    session["last_image"] = image_path
+    return render_template("image.html", image_path=image_path, selections=selections)
+
+
+@app.route("/rate", methods=["POST"])
+def rate():
+    rating_value = int(request.form.get("rating", "0"))
+    selections = session.get("last_selection")
+    if not selections or rating_value not in range(1, 6):
+        return redirect(url_for("index"))
+
+    created_at = datetime.utcnow().isoformat()
+    with get_connection() as connection:
+        connection.execute(
+            "INSERT INTO ratings (rating, selections, created_at) VALUES (?, ?, ?)",
+            (rating_value, json.dumps(selections), created_at),
+        )
+        for category, item in selections.items():
+            connection.execute(
+                """
+                UPDATE items
+                SET total_score = total_score + ?,
+                    rating_count = rating_count + 1
+                WHERE category = ? AND name = ?
+                """,
+                (rating_value, category, item),
+            )
+
+    session.pop("last_selection", None)
+    session.pop("last_image", None)
+    return redirect(url_for("index"))
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=5000, debug=True)

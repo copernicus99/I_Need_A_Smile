@@ -1,9 +1,13 @@
+import base64
 import json
 import os
 import random
 import sqlite3
 import textwrap
 import uuid
+import urllib.error
+import urllib.request
+from io import BytesIO
 from datetime import datetime
 from shutil import copy2
 
@@ -483,17 +487,74 @@ def add_story_elements(image: Image.Image, selections: dict[str, str], palette: 
 
 def generate_image(selections: dict[str, str]) -> str:
     width, height = 900, 520
-    palette = choose_inspiration_palette()
-    image = create_gradient_background(width, height, palette)
-    image = add_whimsical_layers(image, palette)
-    image = image.convert("RGBA")
-    add_story_elements(image, selections, palette)
+    image = generate_ai_image(selections, width, height)
 
     unique_id = uuid.uuid4().hex
     filename = f"smile_{unique_id}.png"
     filepath = os.path.join(GENERATED_DIR, filename)
     image.convert("RGB").save(filepath, format="PNG")
     return f"generated/{filename}"
+
+
+def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Image.Image:
+    api_key = os.environ.get("SMILE_IMAGE_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing SMILE_IMAGE_API_KEY for AI image generation.")
+
+    model = os.environ.get("SMILE_IMAGE_MODEL", "gpt-image-1")
+    prompt = build_prompt(selections)
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "size": os.environ.get("SMILE_IMAGE_SIZE", "1024x1024"),
+        "response_format": "b64_json",
+    }
+    request_data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        os.environ.get("SMILE_IMAGE_API_URL", "https://api.openai.com/v1/images/generations"),
+        data=request_data,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            response_body = response.read()
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8")
+        raise RuntimeError(f"Image generation failed: {error_body}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Image generation failed: {exc.reason}") from exc
+
+    data = json.loads(response_body.decode("utf-8"))
+    image_data = data.get("data", [])
+    if not image_data:
+        raise RuntimeError("Image generation failed: no image data returned.")
+
+    encoded = image_data[0].get("b64_json")
+    if not encoded:
+        raise RuntimeError("Image generation failed: missing image payload.")
+
+    raw_bytes = base64.b64decode(encoded)
+    with Image.open(BytesIO(raw_bytes)) as generated:
+        generated = generated.convert("RGB")
+        return ImageOps.fit(generated, (width, height), method=Image.LANCZOS)
+
+
+def build_prompt(selections: dict[str, str]) -> str:
+    actors = selections["actors"]
+    activities = selections["activities"]
+    areas = selections["areas"]
+    accessories = selections["accessories"]
+    return (
+        "Create a highly detailed, cinematic, joyful illustration. "
+        f"Scene: {actors} {activities} {areas} with {accessories}. "
+        "Use a warm, whimsical palette, dynamic action, and strong character expressions. "
+        "Ensure the scene clearly shows the actors, activity, area, and accessory."
+    )
 
 
 def save_inspiration_image(image_path: str) -> None:
@@ -518,7 +579,10 @@ def index():
 @app.route("/generate", methods=["POST"])
 def generate():
     selections = generate_inspiration()
-    image_path = generate_image(selections)
+    try:
+        image_path = generate_image(selections)
+    except RuntimeError as exc:
+        return render_template("image.html", error=str(exc), selections=selections)
     session["last_selection"] = selections
     session["last_image"] = image_path
     return render_template("image.html", image_path=image_path, selections=selections)

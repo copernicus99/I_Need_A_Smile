@@ -82,11 +82,20 @@
 </head>
 <body>
     <div class="card">
-        <img src="{{ url_for('static', filename=image_path) }}" alt="Smile inspiration">
-        <div class="buttons">
-            <a href="{{ url_for('index') }}"><button class="small-button home" type="button">home</button></a>
-            <button class="small-button" type="button" onclick="openModal()">rate</button>
-        </div>
+        {% if error %}
+            <h2>Unable to generate a smile image</h2>
+            <p>{{ error }}</p>
+            <p>Please configure an AI image provider and try again.</p>
+            <div class="buttons">
+                <a href="{{ url_for('index') }}"><button class="small-button home" type="button">home</button></a>
+            </div>
+        {% else %}
+            <img src="{{ url_for('static', filename=image_path) }}" alt="Smile inspiration">
+            <div class="buttons">
+                <a href="{{ url_for('index') }}"><button class="small-button home" type="button">home</button></a>
+                <button class="small-button" type="button" onclick="openModal()">rate</button>
+            </div>
+        {% endif %}
     </div>
 
     <div class="modal" id="rating-modal">

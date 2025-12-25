@@ -10,22 +10,22 @@ from shutil import copy2
 from flask import Flask, redirect, render_template, request, session, url_for
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, ImageStat
 
-import inspirations
+import inspiration_tags
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(APP_ROOT, "smiles.db")
 GENERATED_DIR = os.path.join(APP_ROOT, "static", "generated")
-INSPIRATION_DIR = os.path.join(APP_ROOT, "static", "inspirations")
+INSPIRATION_DIR = os.path.join(APP_ROOT, "static", "inspiration_images")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SMILE_SECRET", "smile-secret-key")
 
 
 CATEGORIES = {
-    "actors": inspirations.ACTORS,
-    "activities": inspirations.ACTIVITIES,
-    "areas": inspirations.AREAS,
-    "accessories": inspirations.ACCESSORIES,
+    "actors": inspiration_tags.ACTORS,
+    "activities": inspiration_tags.ACTIVITIES,
+    "areas": inspiration_tags.AREAS,
+    "accessories": inspiration_tags.ACCESSORIES,
 }
 
 
@@ -94,10 +94,10 @@ def weighted_choice(category: str, options: list[str]) -> str:
 
 def generate_inspiration() -> dict[str, str]:
     return {
-        "actors": weighted_choice("actors", inspirations.ACTORS),
-        "activities": weighted_choice("activities", inspirations.ACTIVITIES),
-        "areas": weighted_choice("areas", inspirations.AREAS),
-        "accessories": weighted_choice("accessories", inspirations.ACCESSORIES),
+        "actors": weighted_choice("actors", inspiration_tags.ACTORS),
+        "activities": weighted_choice("activities", inspiration_tags.ACTIVITIES),
+        "areas": weighted_choice("areas", inspiration_tags.AREAS),
+        "accessories": weighted_choice("accessories", inspiration_tags.ACCESSORIES),
     }
 
 

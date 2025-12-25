@@ -2,12 +2,13 @@ import json
 import os
 import random
 import sqlite3
+import textwrap
 import uuid
 from datetime import datetime
 from shutil import copy2
 
 from flask import Flask, redirect, render_template, request, session, url_for
-from PIL import Image, ImageFilter, ImageOps, ImageStat
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, ImageStat
 
 import inspiration_tags
 
@@ -111,36 +112,128 @@ def list_inspiration_images() -> list[str]:
     ]
 
 
-def choose_inspiration_background(width: int, height: int) -> tuple[Image.Image | None, tuple[int, int, int]]:
+def extract_palette(source: Image.Image, count: int = 6) -> list[tuple[int, int, int]]:
+    compact = source.resize((64, 64))
+    pixels = list(compact.getdata())
+    if not pixels:
+        return []
+    sample = random.sample(pixels, k=min(count, len(pixels)))
+    return [tuple(int(channel) for channel in color[:3]) for color in sample]
+
+
+def choose_inspiration_palette() -> list[tuple[int, int, int]]:
     images = list_inspiration_images()
     if not images:
-        return None, (110, 110, 110)
+        return [
+            (
+                random.randint(80, 200),
+                random.randint(80, 200),
+                random.randint(80, 200),
+            )
+            for _ in range(5)
+        ]
 
     source_path = random.choice(images)
     with Image.open(source_path) as source:
         source = source.convert("RGB")
-        background = ImageOps.fit(source, (width, height), method=Image.LANCZOS)
+        palette = extract_palette(source)
 
-    blurred = background.filter(ImageFilter.GaussianBlur(radius=3))
-    stats = ImageStat.Stat(blurred)
-    accent = tuple(int(channel) for channel in stats.mean[:3])
-    return blurred, accent
+    if not palette:
+        palette = [(120, 120, 120)]
+    return palette
+
+
+def create_gradient_background(width: int, height: int, palette: list[tuple[int, int, int]]) -> Image.Image:
+    start, end = random.sample(palette, k=min(2, len(palette)))
+    image = Image.new("RGB", (width, height), start)
+    draw = ImageDraw.Draw(image)
+    for y in range(height):
+        ratio = y / max(height - 1, 1)
+        color = tuple(
+            int(start[channel] * (1 - ratio) + end[channel] * ratio) for channel in range(3)
+        )
+        draw.line([(0, y), (width, y)], fill=color)
+    return image
+
+
+def add_whimsical_layers(image: Image.Image, palette: list[tuple[int, int, int]]) -> Image.Image:
+    width, height = image.size
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    for _ in range(18):
+        color = random.choice(palette)
+        alpha = random.randint(60, 140)
+        size = random.randint(int(width * 0.12), int(width * 0.4))
+        x = random.randint(-size // 3, width - size // 2)
+        y = random.randint(-size // 3, height - size // 2)
+        draw.ellipse([x, y, x + size, y + size], fill=(*color, alpha))
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=14))
+    image = Image.alpha_composite(image.convert("RGBA"), overlay)
+
+    draw = ImageDraw.Draw(image)
+    for _ in range(9):
+        color = random.choice(palette)
+        alpha = random.randint(120, 210)
+        x1, y1 = random.randint(0, width), random.randint(0, height)
+        x2, y2 = random.randint(0, width), random.randint(0, height)
+        stroke = random.randint(4, 12)
+        draw.line((x1, y1, x2, y2), fill=(*color, alpha), width=stroke)
+    return image
+
+
+def add_story_elements(image: Image.Image, selections: dict[str, str], palette: list[tuple[int, int, int]]) -> None:
+    width, height = image.size
+    draw = ImageDraw.Draw(image)
+
+    for _ in range(2):
+        radius = random.randint(35, 70)
+        cx = random.randint(int(width * 0.2), int(width * 0.8))
+        cy = random.randint(int(height * 0.3), int(height * 0.7))
+        face_color = random.choice(palette)
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(*face_color, 210))
+        eye_offset = radius // 3
+        for side in (-1, 1):
+            ex = cx + side * eye_offset
+            ey = cy - radius // 5
+            draw.ellipse((ex - 6, ey - 6, ex + 6, ey + 6), fill=(20, 20, 20, 220))
+        draw.arc(
+            (cx - radius // 2, cy, cx + radius // 2, cy + radius // 2),
+            start=0,
+            end=180,
+            fill=(30, 30, 30, 220),
+            width=3,
+        )
+
+    caption = (
+        f"{selections['actors']} {selections['activities']} in {selections['areas']} "
+        f"with {selections['accessories']}"
+    )
+    lines = textwrap.wrap(caption, width=42)
+    font = ImageFont.load_default()
+    line_sizes = [draw.textbbox((0, 0), line, font=font) for line in lines]
+    max_width = max(size[2] - size[0] for size in line_sizes)
+    total_height = sum(size[3] - size[1] for size in line_sizes) + (len(lines) - 1) * 4
+    x = (width - max_width) // 2
+    y = height - total_height - 36
+    padding = 12
+    banner_color = random.choice(palette)
+    draw.rectangle(
+        (x - padding, y - padding, x + max_width + padding, y + total_height + padding),
+        fill=(*banner_color, 170),
+    )
+    current_y = y
+    for line, size in zip(lines, line_sizes):
+        draw.text((x, current_y), line, fill=(20, 20, 20, 230), font=font)
+        current_y += size[3] - size[1] + 4
 
 
 def generate_image(selections: dict[str, str]) -> str:
     width, height = 900, 520
-    inspiration_background, _ = choose_inspiration_background(width, height)
-    if inspiration_background is None:
-        background = (
-            random.randint(80, 200),
-            random.randint(80, 200),
-            random.randint(80, 200),
-        )
-        image = Image.new("RGB", (width, height), color=background)
-    else:
-        image = inspiration_background
-
+    palette = choose_inspiration_palette()
+    image = create_gradient_background(width, height, palette)
+    image = add_whimsical_layers(image, palette)
     image = image.convert("RGBA")
+    add_story_elements(image, selections, palette)
 
     unique_id = uuid.uuid4().hex
     filename = f"smile_{unique_id}.png"

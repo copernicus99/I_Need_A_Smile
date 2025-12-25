@@ -2,12 +2,13 @@ import json
 import os
 import random
 import sqlite3
+import textwrap
 import uuid
 from datetime import datetime
 from shutil import copy2
 
 from flask import Flask, redirect, render_template, request, session, url_for
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, ImageStat
 
 import inspirations
 
@@ -100,47 +101,154 @@ def generate_inspiration() -> dict[str, str]:
     }
 
 
+def list_inspiration_images() -> list[str]:
+    if not os.path.isdir(INSPIRATION_DIR):
+        return []
+    supported = (".png", ".jpg", ".jpeg", ".webp")
+    return [
+        os.path.join(INSPIRATION_DIR, filename)
+        for filename in os.listdir(INSPIRATION_DIR)
+        if filename.lower().endswith(supported)
+    ]
+
+
+def choose_inspiration_background(width: int, height: int) -> tuple[Image.Image | None, tuple[int, int, int]]:
+    images = list_inspiration_images()
+    if not images:
+        return None, (110, 110, 110)
+
+    source_path = random.choice(images)
+    with Image.open(source_path) as source:
+        source = source.convert("RGB")
+        background = ImageOps.fit(source, (width, height), method=Image.LANCZOS)
+
+    blurred = background.filter(ImageFilter.GaussianBlur(radius=3))
+    stats = ImageStat.Stat(blurred)
+    accent = tuple(int(channel) for channel in stats.mean[:3])
+    return blurred, accent
+
+
+def _emoji_for_selection(selections: dict[str, str]) -> str:
+    actor = selections["actors"].lower()
+    activity = selections["activities"].lower()
+    area = selections["areas"].lower()
+    accessory = selections["accessories"].lower()
+    icons = []
+    if "cat" in actor:
+        icons.append("😺")
+    elif "skunk" in actor:
+        icons.append("🦨")
+    elif "owl" in actor:
+        icons.append("🦉")
+    elif "squirrel" in actor:
+        icons.append("🐿️")
+    else:
+        icons.append("🐾")
+
+    if "vaping" in activity:
+        icons.append("💨")
+    elif "sleep" in activity:
+        icons.append("💤")
+    elif "laugh" in activity:
+        icons.append("😂")
+    else:
+        icons.append("✨")
+
+    if "bar" in area or "concert" in area:
+        icons.append("🍸")
+    elif "beach" in area:
+        icons.append("🏖️")
+    else:
+        icons.append("📍")
+
+    if "hat" in accessory:
+        icons.append("🧢")
+    elif "cigarette" in accessory:
+        icons.append("🚬")
+    elif "mushroom" in accessory:
+        icons.append("🍄")
+    else:
+        icons.append("🎒")
+
+    return " ".join(icons)
+
+
 def generate_image(selections: dict[str, str]) -> str:
     width, height = 900, 520
-    background = (
-        random.randint(80, 200),
-        random.randint(80, 200),
-        random.randint(80, 200),
-    )
-    image = Image.new("RGB", (width, height), color=background)
+    inspiration_background, accent = choose_inspiration_background(width, height)
+    if inspiration_background is None:
+        background = (
+            random.randint(80, 200),
+            random.randint(80, 200),
+            random.randint(80, 200),
+        )
+        image = Image.new("RGB", (width, height), color=background)
+        accent = (30, 30, 30)
+    else:
+        image = inspiration_background
+
+    image = image.convert("RGBA")
+    overlay = Image.new("RGBA", (width, height), color=(0, 0, 0, 60))
+    image = Image.alpha_composite(image, overlay)
     draw = ImageDraw.Draw(image)
 
-    for index in range(10):
-        color = (
-            random.randint(0, 255),
-            random.randint(0, 255),
-            random.randint(0, 255),
-        )
-        x0 = random.randint(0, width - 50)
-        y0 = random.randint(0, height - 50)
-        x1 = x0 + random.randint(40, 180)
-        y1 = y0 + random.randint(40, 180)
-        draw.ellipse([x0, y0, x1, y1], fill=color, outline=(255, 255, 255))
-
     title = "Your Smile Inspiration"
+    scene = (
+        f"A {selections['actors']} "
+        f"{selections['activities'].lower()} "
+        f"{selections['areas'].lower()} "
+        f"with {selections['accessories'].lower()}."
+    )
     lines = [
         f"Actor: {selections['actors']}",
         f"Activity: {selections['activities']}",
         f"Area: {selections['areas']}",
         f"Accessory: {selections['accessories']}",
     ]
+    emoji_line = _emoji_for_selection(selections)
 
     font = ImageFont.load_default()
-    draw.text((30, 30), title, fill=(20, 20, 20), font=font)
-    y_offset = 80
+    title_color = (255, 255, 255, 230)
+    body_color = (255, 255, 255, 220)
+
+    panel_margin = 30
+    panel_width = width - panel_margin * 2
+    panel_height = height - panel_margin * 2
+    panel = Image.new("RGBA", (panel_width, panel_height), color=(0, 0, 0, 0))
+    panel_draw = ImageDraw.Draw(panel)
+    panel_color = (*accent, 160)
+    panel_draw.rounded_rectangle(
+        [0, 0, panel_width, panel_height],
+        radius=24,
+        fill=panel_color,
+        outline=(255, 255, 255, 140),
+        width=2,
+    )
+    image.alpha_composite(panel, dest=(panel_margin, panel_margin))
+
+    draw.text((60, 50), title, fill=title_color, font=font)
+    draw.text((60, 80), emoji_line, fill=title_color, font=font)
+
+    wrapped_scene = textwrap.wrap(scene, width=50)
+    y_offset = 120
+    for line in wrapped_scene:
+        draw.text((60, y_offset), line, fill=body_color, font=font)
+        y_offset += 20
+
+    y_offset += 10
     for line in lines:
-        draw.text((40, y_offset), line, fill=(20, 20, 20), font=font)
-        y_offset += 40
+        draw.text((60, y_offset), line, fill=body_color, font=font)
+        y_offset += 28
+
+    smile_box = [width - 220, height - 180, width - 40, height - 40]
+    draw.arc(smile_box, start=200, end=340, fill=(255, 255, 255, 220), width=6)
+    draw.ellipse([width - 180, height - 200, width - 170, height - 190], fill=(255, 255, 255, 220))
+    draw.ellipse([width - 110, height - 200, width - 100, height - 190], fill=(255, 255, 255, 220))
 
     unique_id = uuid.uuid4().hex
     filename = f"smile_{unique_id}.png"
     filepath = os.path.join(GENERATED_DIR, filename)
-    image.save(filepath, format="PNG")
+    image.convert("RGB").save(filepath, format="PNG")
     return f"generated/{filename}"
 
 

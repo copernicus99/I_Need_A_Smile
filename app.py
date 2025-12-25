@@ -497,9 +497,9 @@ def generate_image(selections: dict[str, str]) -> str:
 
 
 def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Image.Image:
-    api_key = os.environ.get("SMILE_IMAGE_API_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("Missing SMILE_IMAGE_API_KEY for AI image generation.")
+        raise RuntimeError("Missing OPENAI_API_KEY for AI image generation.")
 
     model = os.environ.get("SMILE_IMAGE_MODEL", "gpt-image-1")
     prompt = build_prompt(selections)

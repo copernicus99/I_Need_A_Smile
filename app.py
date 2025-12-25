@@ -185,46 +185,300 @@ def add_story_elements(image: Image.Image, selections: dict[str, str], palette: 
     width, height = image.size
     draw = ImageDraw.Draw(image)
 
-    for _ in range(2):
-        radius = random.randint(35, 70)
-        cx = random.randint(int(width * 0.2), int(width * 0.8))
-        cy = random.randint(int(height * 0.3), int(height * 0.7))
-        face_color = random.choice(palette)
-        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(*face_color, 210))
-        eye_offset = radius // 3
-        for side in (-1, 1):
-            ex = cx + side * eye_offset
-            ey = cy - radius // 5
-            draw.ellipse((ex - 6, ey - 6, ex + 6, ey + 6), fill=(20, 20, 20, 220))
-        draw.arc(
-            (cx - radius // 2, cy, cx + radius // 2, cy + radius // 2),
-            start=0,
-            end=180,
-            fill=(30, 30, 30, 220),
-            width=3,
+    def adjust_color(color: tuple[int, int, int], factor: float) -> tuple[int, int, int]:
+        return tuple(max(0, min(255, int(channel * factor))) for channel in color)
+
+    def draw_owl(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        cx = (x1 + x2) // 2
+        cy = (y1 + y2) // 2
+        radius = min(x2 - x1, y2 - y1) // 2
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=fill)
+        eye_radius = radius // 3
+        for offset in (-eye_radius, eye_radius):
+            draw.ellipse(
+                (cx + offset - eye_radius, cy - eye_radius, cx + offset + eye_radius, cy + eye_radius),
+                fill=(245, 245, 245),
+            )
+            draw.ellipse(
+                (
+                    cx + offset - eye_radius // 3,
+                    cy - eye_radius // 3,
+                    cx + offset + eye_radius // 3,
+                    cy + eye_radius // 3,
+                ),
+                fill=(40, 40, 40),
+            )
+        draw.polygon(
+            [(cx, cy + eye_radius // 2), (cx - eye_radius // 2, cy + eye_radius), (cx + eye_radius // 2, cy + eye_radius)],
+            fill=(245, 180, 60),
         )
 
-    caption = (
-        f"{selections['actors']} {selections['activities']} in {selections['areas']} "
-        f"with {selections['accessories']}"
-    )
-    lines = textwrap.wrap(caption, width=42)
+    def draw_cat(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        radius = min(x2 - x1, y2 - y1) // 2
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=fill)
+        ear_size = radius // 2
+        draw.polygon([(cx - radius, cy - radius // 2), (cx - radius + ear_size, cy - radius - ear_size), (cx, cy - radius // 2)], fill=fill)
+        draw.polygon([(cx + radius, cy - radius // 2), (cx + radius - ear_size, cy - radius - ear_size), (cx, cy - radius // 2)], fill=fill)
+        draw.ellipse((cx - radius // 2, cy - radius // 4, cx - radius // 3, cy), fill=(40, 40, 40))
+        draw.ellipse((cx + radius // 3, cy - radius // 4, cx + radius // 2, cy), fill=(40, 40, 40))
+        draw.line((cx - radius // 2, cy + radius // 6, cx - radius, cy + radius // 4), fill=(40, 40, 40), width=2)
+        draw.line((cx + radius // 2, cy + radius // 6, cx + radius, cy + radius // 4), fill=(40, 40, 40), width=2)
+
+    def draw_chicken(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        radius = min(x2 - x1, y2 - y1) // 2
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=fill)
+        comb_radius = radius // 3
+        draw.ellipse((cx - comb_radius, cy - radius - comb_radius // 2, cx + comb_radius, cy - radius + comb_radius), fill=(220, 60, 60))
+        draw.polygon(
+            [(cx + radius // 2, cy, cx + radius, cy + radius // 6, cx + radius // 2, cy + radius // 3)],
+            fill=(245, 180, 60),
+        )
+        draw.ellipse((cx - radius // 3, cy - radius // 4, cx - radius // 6, cy), fill=(30, 30, 30))
+
+    def draw_skunk(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse(box, fill=fill)
+        cx = (x1 + x2) // 2
+        draw.rectangle((cx - 6, y1 + 6, cx + 6, y2 - 6), fill=(245, 245, 245))
+        draw.ellipse((x2 - 18, y1 + 8, x2, y1 + 26), fill=(245, 245, 245))
+
+    def draw_possum(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse(box, fill=fill)
+        draw.ellipse((x1 + 8, y1 + 12, x1 + 24, y1 + 28), fill=(245, 245, 245))
+        draw.ellipse((x2 - 24, y1 + 12, x2 - 8, y1 + 28), fill=(245, 245, 245))
+        draw.line((x2 - 6, y2 - 12, x2 + 18, y2 - 2), fill=(150, 150, 150), width=4)
+
+    def draw_squirrel(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse((x1 + 10, y1 + 10, x2 - 20, y2 - 10), fill=fill)
+        draw.ellipse((x2 - 30, y1 - 6, x2 + 10, y2 - 20), outline=fill, width=6)
+
+    def draw_vaping(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 10, y2 - 20, x1 + 38, y2 - 8), fill=fill)
+        draw.line((x1 + 38, y2 - 14, x1 + 58, y2 - 20), fill=fill, width=4)
+        for offset in range(3):
+            draw.arc((x1 + 40 + offset * 8, y1 + 6, x1 + 58 + offset * 8, y1 + 24), 200, 20, fill=(235, 235, 235), width=3)
+
+    def draw_sleeping(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse((x1 + 10, y1 + 10, x2 - 10, y2 - 10), outline=fill, width=4)
+        draw.text((x1 + 18, y1 + 8), "Zz", fill=fill, font=ImageFont.load_default())
+
+    def draw_falling(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.line((x1 + 20, y1 + 20, x2 - 20, y2 - 20), fill=fill, width=4)
+        draw.ellipse((x2 - 26, y2 - 26, x2 - 10, y2 - 10), fill=fill)
+
+    def draw_slipping(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.arc((x1 + 8, y2 - 30, x1 + 46, y2 - 6), 200, 20, fill=(245, 215, 90), width=6)
+        draw.line((x1 + 50, y1 + 20, x2 - 20, y2 - 10), fill=fill, width=4)
+        draw.ellipse((x2 - 20, y2 - 20, x2 - 6, y2 - 6), fill=fill)
+
+    def draw_laughing(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse(box, fill=fill)
+        draw.arc((x1 + 14, y1 + 14, x2 - 14, y2 - 14), 200, 340, fill=(30, 30, 30), width=4)
+        draw.ellipse((x1 + 20, y1 + 20, x1 + 32, y1 + 32), fill=(30, 30, 30))
+        draw.ellipse((x2 - 32, y1 + 20, x2 - 20, y1 + 32), fill=(30, 30, 30))
+
+    def draw_mischief(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle(box, outline=fill, width=4)
+        draw.ellipse((x1 + 12, y1 + 18, x1 + 30, y1 + 36), fill=fill)
+        draw.ellipse((x2 - 30, y1 + 18, x2 - 12, y1 + 36), fill=fill)
+        draw.arc((x1 + 16, y2 - 30, x2 - 16, y2 - 10), 0, 180, fill=fill, width=3)
+
+    def draw_snowboarding(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.line((x1 + 10, y2 - 18, x2 - 10, y2 - 6), fill=fill, width=6)
+        draw.line((x1 + 20, y1 + 20, x2 - 30, y2 - 24), fill=fill, width=4)
+        draw.ellipse((x2 - 34, y2 - 42, x2 - 18, y2 - 26), fill=fill)
+
+    def draw_fishing(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.line((x1 + 12, y1 + 10, x2 - 12, y2 - 10), fill=fill, width=4)
+        draw.line((x2 - 12, y2 - 10, x2 - 6, y2 + 4), fill=fill, width=2)
+        draw.ellipse((x2 - 10, y2, x2 + 4, y2 + 14), outline=fill, width=3)
+
+    def draw_car(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 10, y1 + 20, x2 - 10, y2 - 12), fill=fill)
+        draw.rectangle((x1 + 24, y1 + 6, x2 - 24, y1 + 24), fill=fill)
+        draw.ellipse((x1 + 16, y2 - 18, x1 + 34, y2), fill=(30, 30, 30))
+        draw.ellipse((x2 - 34, y2 - 18, x2 - 16, y2), fill=(30, 30, 30))
+
+    def draw_bar(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 10, y2 - 24, x2 - 10, y2 - 8), fill=fill)
+        for offset in (0, 18, 36):
+            draw.rectangle((x1 + 12 + offset, y1 + 12, x1 + 20 + offset, y2 - 26), fill=(240, 240, 240))
+
+    def draw_beach(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse((x1 + 8, y1 + 8, x1 + 28, y1 + 28), fill=(245, 215, 90))
+        draw.rectangle((x1 + 8, y2 - 18, x2 - 8, y2 - 8), fill=(90, 170, 220))
+        draw.arc((x1 + 8, y2 - 30, x2 - 8, y2 - 6), 0, 180, fill=(240, 210, 140), width=4)
+
+    def draw_store_sign(box: tuple[int, int, int, int], label: str, fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 8, y1 + 10, x2 - 8, y2 - 12), outline=fill, width=3)
+        draw.text((x1 + 12, y1 + 18), label, fill=fill, font=ImageFont.load_default())
+
+    def draw_concert(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.line((x1 + 20, y1 + 10, x1 + 20, y2 - 10), fill=fill, width=4)
+        draw.ellipse((x1 + 20, y1 + 10, x2 - 10, y1 + 34), outline=fill, width=4)
+        draw.text((x2 - 24, y2 - 26), "♪", fill=fill, font=ImageFont.load_default())
+
+    def draw_cigarettes(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 12, y2 - 22, x2 - 12, y2 - 14), fill=fill)
+        draw.rectangle((x2 - 24, y2 - 22, x2 - 12, y2 - 14), fill=(240, 200, 120))
+        draw.arc((x1 + 6, y1 + 6, x1 + 24, y1 + 24), 200, 20, fill=(220, 220, 220), width=2)
+
+    def draw_hat(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 16, y1 + 18, x2 - 16, y2 - 12), fill=fill)
+        draw.rectangle((x1 + 8, y2 - 16, x2 - 8, y2 - 8), fill=fill)
+
+    def draw_boot(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 20, y1 + 10, x1 + 36, y2 - 16), fill=fill)
+        draw.rectangle((x1 + 20, y2 - 16, x2 - 12, y2 - 8), fill=fill)
+
+    def draw_mushroom(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.arc((x1 + 8, y1 + 4, x2 - 8, y2 - 10), 0, 180, fill=fill, width=6)
+        draw.rectangle((x1 + 24, y1 + 24, x2 - 24, y2 - 8), fill=(245, 230, 210))
+
+    def draw_speech_bubble(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 10, y1 + 10, x2 - 10, y2 - 16), outline=fill, width=3)
+        draw.polygon([(x1 + 24, y2 - 16), (x1 + 30, y2 - 2), (x1 + 40, y2 - 16)], fill=fill)
+        draw.text((x1 + 22, y1 + 18), "!", fill=fill, font=ImageFont.load_default())
+
+    def draw_gun(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.rectangle((x1 + 10, y1 + 20, x2 - 12, y1 + 32), fill=fill)
+        draw.rectangle((x1 + 28, y1 + 32, x1 + 42, y2 - 10), fill=fill)
+        draw.rectangle((x2 - 18, y1 + 22, x2 - 6, y1 + 28), fill=fill)
+
+    def draw_wheel(box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        x1, y1, x2, y2 = box
+        draw.ellipse(box, outline=fill, width=4)
+        draw.line((x1 + 10, (y1 + y2) // 2, x2 - 10, (y1 + y2) // 2), fill=fill, width=2)
+        draw.line(((x1 + x2) // 2, y1 + 10, (x1 + x2) // 2, y2 - 10), fill=fill, width=2)
+
+    def draw_icon_for_tag(tag: str, box: tuple[int, int, int, int], fill: tuple[int, int, int]) -> None:
+        lower_tag = tag.lower()
+        if "owl" in lower_tag:
+            draw_owl(box, fill)
+        elif "cat" in lower_tag or "kitten" in lower_tag:
+            draw_cat(box, fill)
+            if "dirty" in lower_tag:
+                draw.ellipse((box[0] + 8, box[1] + 12, box[0] + 18, box[1] + 22), fill=(90, 90, 90))
+        elif "skunk" in lower_tag:
+            draw_skunk(box, fill)
+        elif "possum" in lower_tag:
+            draw_possum(box, fill)
+        elif "chicken" in lower_tag:
+            draw_chicken(box, fill)
+        elif "squirrel" in lower_tag:
+            draw_squirrel(box, fill)
+        elif "vaping" in lower_tag:
+            draw_vaping(box, fill)
+        elif "sleep" in lower_tag:
+            draw_sleeping(box, fill)
+        elif "falling" in lower_tag:
+            draw_falling(box, fill)
+        elif "slipping" in lower_tag:
+            draw_slipping(box, fill)
+        elif "laugh" in lower_tag:
+            draw_laughing(box, fill)
+        elif "mischief" in lower_tag:
+            draw_mischief(box, fill)
+        elif "snowboard" in lower_tag:
+            draw_snowboarding(box, fill)
+        elif "fishing" in lower_tag:
+            draw_fishing(box, fill)
+        elif "car" in lower_tag:
+            draw_car(box, fill)
+        elif "bar" in lower_tag:
+            draw_bar(box, fill)
+        elif "beach" in lower_tag:
+            draw_beach(box, fill)
+        elif "wawa" in lower_tag:
+            draw_store_sign(box, "Wawa", fill)
+        elif "rock concert" in lower_tag:
+            draw_concert(box, fill)
+        elif "applebee" in lower_tag:
+            draw_store_sign(box, "Applebee's", fill)
+        elif "cigarette" in lower_tag:
+            draw_cigarettes(box, fill)
+        elif "hat" in lower_tag:
+            draw_hat(box, fill)
+        elif "boot" in lower_tag:
+            draw_boot(box, fill)
+        elif "mushroom" in lower_tag:
+            draw_mushroom(box, fill)
+        elif "bitchy woman" in lower_tag:
+            draw_speech_bubble(box, fill)
+        elif "gun" in lower_tag:
+            draw_gun(box, fill)
+        elif "wheel" in lower_tag:
+            draw_wheel(box, fill)
+        else:
+            draw.rectangle(box, outline=fill, width=4)
+
     font = ImageFont.load_default()
-    line_sizes = [draw.textbbox((0, 0), line, font=font) for line in lines]
-    max_width = max(size[2] - size[0] for size in line_sizes)
-    total_height = sum(size[3] - size[1] for size in line_sizes) + (len(lines) - 1) * 4
-    x = (width - max_width) // 2
-    y = height - total_height - 36
-    padding = 12
-    banner_color = random.choice(palette)
-    draw.rectangle(
-        (x - padding, y - padding, x + max_width + padding, y + total_height + padding),
-        fill=(*banner_color, 170),
-    )
-    current_y = y
-    for line, size in zip(lines, line_sizes):
-        draw.text((x, current_y), line, fill=(20, 20, 20, 230), font=font)
-        current_y += size[3] - size[1] + 4
+    cards = [
+        ("Actors", selections["actors"]),
+        ("Activities", selections["activities"]),
+        ("Area", selections["areas"]),
+        ("Accessory", selections["accessories"]),
+    ]
+    card_width = int(width * 0.42)
+    card_height = int(height * 0.32)
+    padding = int(width * 0.04)
+    positions = [
+        (padding, padding),
+        (width - card_width - padding, padding),
+        (padding, height - card_height - padding),
+        (width - card_width - padding, height - card_height - padding),
+    ]
+
+    for (title, value), (x, y) in zip(cards, positions):
+        base_color = random.choice(palette)
+        card_color = (*adjust_color(base_color, 1.1), 220)
+        outline_color = adjust_color(base_color, 0.7)
+        draw.rounded_rectangle(
+            (x, y, x + card_width, y + card_height),
+            radius=24,
+            fill=card_color,
+            outline=outline_color,
+            width=3,
+        )
+        draw.text((x + 18, y + 14), title, fill=(30, 30, 30, 230), font=font)
+        value_lines = textwrap.wrap(value, width=18)
+        text_y = y + 36
+        for line in value_lines:
+            draw.text((x + 18, text_y), line, fill=(25, 25, 25, 240), font=font)
+            text_y += 14
+        icon_box = (
+            x + card_width - 86,
+            y + 24,
+            x + card_width - 18,
+            y + 92,
+        )
+        draw_icon_for_tag(value, icon_box, outline_color)
 
 
 def generate_image(selections: dict[str, str]) -> str:

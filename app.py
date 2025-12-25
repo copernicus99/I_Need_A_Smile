@@ -4,6 +4,7 @@ import random
 import sqlite3
 import uuid
 from datetime import datetime
+from shutil import copy2
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,7 @@ import inspirations
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(APP_ROOT, "smiles.db")
 GENERATED_DIR = os.path.join(APP_ROOT, "static", "generated")
+INSPIRATION_DIR = os.path.join(APP_ROOT, "static", "inspirations")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SMILE_SECRET", "smile-secret-key")
@@ -34,6 +36,7 @@ def get_connection():
 
 def init_db() -> None:
     os.makedirs(GENERATED_DIR, exist_ok=True)
+    os.makedirs(INSPIRATION_DIR, exist_ok=True)
     with get_connection() as connection:
         connection.execute(
             """
@@ -141,6 +144,17 @@ def generate_image(selections: dict[str, str]) -> str:
     return f"generated/{filename}"
 
 
+def save_inspiration_image(image_path: str) -> None:
+    if not image_path:
+        return
+    source_path = os.path.join(APP_ROOT, "static", image_path)
+    if not os.path.exists(source_path):
+        return
+    inspiration_name = f"inspiration_{uuid.uuid4().hex}.png"
+    destination_path = os.path.join(INSPIRATION_DIR, inspiration_name)
+    copy2(source_path, destination_path)
+
+
 init_db()
 
 
@@ -162,6 +176,7 @@ def generate():
 def rate():
     rating_value = int(request.form.get("rating", "0"))
     selections = session.get("last_selection")
+    image_path = session.get("last_image")
     if not selections or rating_value not in range(1, 6):
         return redirect(url_for("index"))
 
@@ -181,6 +196,9 @@ def rate():
                 """,
                 (rating_value, category, item),
             )
+
+    if rating_value == 5:
+        save_inspiration_image(image_path)
 
     session.pop("last_selection", None)
     session.pop("last_image", None)

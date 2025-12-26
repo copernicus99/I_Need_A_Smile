@@ -26,10 +26,12 @@ app.secret_key = os.environ.get("SMILE_SECRET", "smile-secret-key")
 
 
 CATEGORIES = {
-    "actors": inspiration_tags.ACTORS,
+    "actor_protagonist": inspiration_tags.ACTOR_PROTGONIST,
+    "actor_supporting": inspiration_tags.ACTOR_SUPPORTING,
     "activities": inspiration_tags.ACTIVITIES,
     "areas": inspiration_tags.AREAS,
     "accessories": inspiration_tags.ACCESSORIES,
+    "art_style": inspiration_tags.ART_STYLE,
 }
 
 
@@ -101,18 +103,60 @@ def weighted_choice(category: str, options: list[str]) -> str:
     return random.choices(names, weights=weights, k=1)[0]
 
 
+def weighted_choices(category: str, options: list[str], count: int) -> list[str]:
+    selections = []
+    remaining = list(options)
+    for _ in range(min(count, len(remaining))):
+        pick = weighted_choice(category, remaining)
+        selections.append(pick)
+        remaining.remove(pick)
+    return selections
+
+
+def pick_count(options: list[str], max_count: int = 2) -> int:
+    if len(options) < 2:
+        return 1
+    return random.randint(1, min(max_count, len(options)))
+
+
 # Pick a themed set of inspiration tags for the prompt.
-def generate_inspiration() -> dict[str, str]:
+def generate_inspiration() -> dict[str, list[str]]:
     return {
-        "actors": weighted_choice("actors", inspiration_tags.ACTORS),
-        "activities": weighted_choice("activities", inspiration_tags.ACTIVITIES),
-        "areas": weighted_choice("areas", inspiration_tags.AREAS),
-        "accessories": weighted_choice("accessories", inspiration_tags.ACCESSORIES),
+        "actor_protagonist": weighted_choices(
+            "actor_protagonist",
+            inspiration_tags.ACTOR_PROTGONIST,
+            pick_count(inspiration_tags.ACTOR_PROTGONIST),
+        ),
+        "actor_supporting": weighted_choices(
+            "actor_supporting",
+            inspiration_tags.ACTOR_SUPPORTING,
+            pick_count(inspiration_tags.ACTOR_SUPPORTING),
+        ),
+        "activities": weighted_choices(
+            "activities",
+            inspiration_tags.ACTIVITIES,
+            pick_count(inspiration_tags.ACTIVITIES),
+        ),
+        "areas": weighted_choices(
+            "areas",
+            inspiration_tags.AREAS,
+            pick_count(inspiration_tags.AREAS),
+        ),
+        "accessories": weighted_choices(
+            "accessories",
+            inspiration_tags.ACCESSORIES,
+            pick_count(inspiration_tags.ACCESSORIES),
+        ),
+        "art_style": weighted_choices(
+            "art_style",
+            inspiration_tags.ART_STYLE,
+            1,
+        ),
     }
 
 
 # Build the prompt and rely on the external image API for rendering.
-def generate_image(selections: dict[str, str]) -> str:
+def generate_image(selections: dict[str, list[str]]) -> str:
     width, height = 900, 520
     image = generate_ai_image(selections, width, height)
 
@@ -124,7 +168,7 @@ def generate_image(selections: dict[str, str]) -> str:
 
 
 # Send the final prompt to the OpenAI image generation API.
-def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Image.Image:
+def generate_ai_image(selections: dict[str, list[str]], width: int, height: int) -> Image.Image:
     api_key = os.environ.get("SMILE_IMAGE_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("Missing SMILE_IMAGE_API_KEY or OPENAI_API_KEY for AI image generation.")
@@ -172,16 +216,30 @@ def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Im
 
 
 # Compose a consistent, detailed prompt for image generation.
-def build_prompt(selections: dict[str, str]) -> str:
-    actors = selections["actors"]
-    activities = selections["activities"]
-    areas = selections["areas"]
-    accessories = selections["accessories"]
+def format_tag_list(tags: list[str]) -> str:
+    if not tags:
+        return ""
+    if len(tags) == 1:
+        return tags[0]
+    if len(tags) == 2:
+        return f"{tags[0]} and {tags[1]}"
+    return f"{', '.join(tags[:-1])}, and {tags[-1]}"
+
+
+def build_prompt(selections: dict[str, list[str]]) -> str:
+    protagonist = format_tag_list(selections["actor_protagonist"])
+    supporting = format_tag_list(selections["actor_supporting"])
+    activities = format_tag_list(selections["activities"])
+    areas = format_tag_list(selections["areas"])
+    accessories = format_tag_list(selections["accessories"])
+    art_style = format_tag_list(selections["art_style"])
     return (
-        "Create a highly detailed, cinematic, joyful illustration. "
-        f"Scene: {actors} {activities} {areas} with {accessories}. "
-        "Use a warm, whimsical palette, dynamic action, and strong character expressions. "
-        "Ensure the scene clearly shows the actors, activity, area, and accessory."
+        "Create a whimsical, joyful illustration intended to elicit laughter from viewer. "
+        f"Scene: {protagonist} with {supporting} {activities} {areas} with {accessories}. "
+        "Include dynamic action and strong character expressions. "
+        "Ensure the scene clearly shows the actors (main and supporting), activity, area, accessory "
+        "and is rendered in the specified style. "
+        f"Render in a {art_style} style with a warm, whimsical palette."
     )
 
 
@@ -234,16 +292,17 @@ def rate():
             "INSERT INTO ratings (rating, selections, created_at) VALUES (?, ?, ?)",
             (rating_value, json.dumps(selections), created_at),
         )
-        for category, item in selections.items():
-            connection.execute(
-                """
-                UPDATE items
-                SET total_score = total_score + ?,
-                    rating_count = rating_count + 1
-                WHERE category = ? AND name = ?
-                """,
-                (rating_value, category, item),
-            )
+        for category, items in selections.items():
+            for item in items:
+                connection.execute(
+                    """
+                    UPDATE items
+                    SET total_score = total_score + ?,
+                        rating_count = rating_count + 1
+                    WHERE category = ? AND name = ?
+                    """,
+                    (rating_value, category, item),
+                )
 
     if rating_value == 5:
         save_inspiration_image(image_path)

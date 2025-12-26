@@ -7,6 +7,7 @@ import uuid
 import urllib.error
 import urllib.request
 from datetime import datetime
+from datetime import datetime
 from io import BytesIO
 from shutil import copy2
 
@@ -17,6 +18,7 @@ import inspiration_tags
 import settings
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROMPT_LOG_PATH = os.path.join(APP_ROOT, "prompt_log.txt")
 DB_PATH = os.path.join(APP_ROOT, "smiles.db")
 GENERATED_DIR = os.path.join(APP_ROOT, "static", "generated")
 INSPIRATION_DIR = os.path.join(APP_ROOT, "static", "inspiration_images")
@@ -175,6 +177,7 @@ def generate_ai_image(selections: dict[str, list[str]], width: int, height: int)
 
     model = os.environ.get("SMILE_IMAGE_MODEL", "gpt-image-1")
     prompt = build_prompt(selections)
+    log_prompt(prompt)
     payload = {
         "model": model,
         "prompt": prompt,
@@ -241,6 +244,13 @@ def build_prompt(selections: dict[str, list[str]]) -> str:
         "and is rendered in the specified style. "
         f"Render in a {art_style} style with a warm, whimsical palette."
     )
+
+
+def log_prompt(prompt: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"{timestamp} | {prompt}\n"
+    with open(PROMPT_LOG_PATH, "a", encoding="utf-8") as log_file:
+        log_file.write(entry)
 
 
 # Keep highly rated images as inspiration inputs for later generations.

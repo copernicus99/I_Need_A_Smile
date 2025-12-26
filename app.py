@@ -29,6 +29,7 @@ CATEGORIES = {
     "areas": inspiration_tags.AREAS,
     "accessories": inspiration_tags.ACCESSORIES,
     "art_style": inspiration_tags.ART_STYLE,
+    "rarely": inspiration_tags.RARELY,
 }
 
 
@@ -58,13 +59,36 @@ def pick_count(options: list[str], max_count: int = 2) -> int:
     return random.randint(1, min(max_count, len(options)))
 
 
+def load_recent_prompt_entries(limit: int) -> list[str]:
+    if not os.path.exists(PROMPT_LOG_PATH):
+        return []
+    with open(PROMPT_LOG_PATH, "r", encoding="utf-8") as log_file:
+        content = log_file.read()
+    entries = [entry.strip() for entry in content.split("\n\n") if entry.strip()]
+    return entries[-limit:]
+
+
+def recent_entries_contain_any(entries: list[str], tags: list[str]) -> bool:
+    return any(tag in entry for entry in entries for tag in tags)
+
+
 # Pick a themed set of inspiration tags for the prompt.
 def generate_inspiration() -> dict[str, list[str]]:
+    recent_entries_10 = load_recent_prompt_entries(10)
+    recent_entries_3 = load_recent_prompt_entries(3)
+    include_rarely = not recent_entries_contain_any(recent_entries_10, inspiration_tags.RARELY)
+    include_actor_protagonist = not recent_entries_contain_any(
+        recent_entries_3, inspiration_tags.ACTOR_PROTGONIST
+    )
     return {
-        "actor_protagonist": weighted_choices(
-            "actor_protagonist",
-            inspiration_tags.ACTOR_PROTGONIST,
-            pick_count(inspiration_tags.ACTOR_PROTGONIST),
+        "actor_protagonist": (
+            weighted_choices(
+                "actor_protagonist",
+                inspiration_tags.ACTOR_PROTGONIST,
+                1,
+            )
+            if include_actor_protagonist
+            else []
         ),
         "actor_supporting": weighted_choices(
             "actor_supporting",
@@ -79,7 +103,7 @@ def generate_inspiration() -> dict[str, list[str]]:
         "areas": weighted_choices(
             "areas",
             inspiration_tags.AREAS,
-            pick_count(inspiration_tags.AREAS),
+            1,
         ),
         "accessories": weighted_choices(
             "accessories",
@@ -90,6 +114,15 @@ def generate_inspiration() -> dict[str, list[str]]:
             "art_style",
             inspiration_tags.ART_STYLE,
             1,
+        ),
+        "rarely": (
+            weighted_choices(
+                "rarely",
+                inspiration_tags.RARELY,
+                1,
+            )
+            if include_rarely
+            else []
         ),
     }
 
@@ -167,12 +200,28 @@ def format_tag_list(tags: list[str]) -> str:
 
 
 def build_scene_description(selections: dict[str, list[str]]) -> str:
-    protagonist = format_tag_list(selections["actor_protagonist"])
-    supporting = format_tag_list(selections["actor_supporting"])
-    activities = format_tag_list(selections["activities"])
-    areas = format_tag_list(selections["areas"])
-    accessories = format_tag_list(selections["accessories"])
-    return f"{protagonist} with {supporting} {activities} {areas} with {accessories}."
+    protagonist = format_tag_list(selections.get("actor_protagonist", []))
+    supporting = format_tag_list(selections.get("actor_supporting", []))
+    activities = format_tag_list(selections.get("activities", []))
+    areas = format_tag_list(selections.get("areas", []))
+    accessories = format_tag_list(selections.get("accessories", []))
+    rarely = format_tag_list(selections.get("rarely", []))
+    actor_bits = [bit for bit in (protagonist, rarely) if bit]
+    parts = []
+    if actor_bits:
+        parts.append(" and ".join(actor_bits))
+    if supporting:
+        if actor_bits:
+            parts.append(f"with {supporting}")
+        else:
+            parts.append(supporting)
+    if activities:
+        parts.append(activities)
+    if areas:
+        parts.append(areas)
+    if accessories:
+        parts.append(f"with {accessories}")
+    return f"{' '.join(parts).strip()}."
 
 
 def build_prompt(selections: dict[str, list[str]]) -> str:
@@ -182,7 +231,7 @@ def build_prompt(selections: dict[str, list[str]]) -> str:
         "Create a whimsical, joyful illustration intended to elicit laughter from viewer. "
         f"Scene: {scene_description} "
         "Include dynamic action and strong character expressions. "
-        "Ensure the scene clearly shows the actors (main and supporting), activity, area, accessory "
+        "Ensure the scene clearly shows the actors (main when present and supporting), activity, area, accessory "
         "and is rendered in the specified style. "
         f"Render in a {art_style} style."
     )

@@ -29,7 +29,7 @@ CATEGORIES = {
     "areas": inspiration_tags.AREAS,
     "accessories": inspiration_tags.ACCESSORIES,
     "art_style": inspiration_tags.ART_STYLE,
-    "rarely": inspiration_tags.RARELY,
+    "villan": inspiration_tags.VILLAN,
 }
 
 
@@ -59,12 +59,17 @@ def pick_count(options: list[str], max_count: int = 2) -> int:
     return random.randint(1, min(max_count, len(options)))
 
 
-def load_recent_prompt_entries(limit: int) -> list[str]:
+def load_prompt_entries() -> list[str]:
     if not os.path.exists(PROMPT_LOG_PATH):
         return []
     with open(PROMPT_LOG_PATH, "r", encoding="utf-8") as log_file:
         content = log_file.read()
     entries = [entry.strip() for entry in content.split("\n\n") if entry.strip()]
+    return entries
+
+
+def load_recent_prompt_entries(limit: int) -> list[str]:
+    entries = load_prompt_entries()
     return entries[-limit:]
 
 
@@ -72,14 +77,19 @@ def recent_entries_contain_any(entries: list[str], tags: list[str]) -> bool:
     return any(tag in entry for entry in entries for tag in tags)
 
 
+def count_entries_containing_any(entries: list[str], tags: list[str]) -> int:
+    return sum(1 for entry in entries if any(tag in entry for tag in tags))
+
+
 # Pick a themed set of inspiration tags for the prompt.
 def generate_inspiration() -> dict[str, list[str]]:
-    recent_entries_10 = load_recent_prompt_entries(10)
-    recent_entries_3 = load_recent_prompt_entries(3)
-    include_rarely = not recent_entries_contain_any(recent_entries_10, inspiration_tags.RARELY)
-    include_actor_protagonist = not recent_entries_contain_any(
-        recent_entries_3, inspiration_tags.ACTOR_PROTGONIST
+    all_entries = load_prompt_entries()
+    total_entries = len(all_entries)
+    actor_protagonist_entries = count_entries_containing_any(
+        all_entries, inspiration_tags.ACTOR_PROTGONIST
     )
+    include_actor_protagonist = (total_entries + 1) % 4 == 0
+    include_villan = include_actor_protagonist and (actor_protagonist_entries + 1) % 3 == 0
     return {
         "actor_protagonist": (
             weighted_choices(
@@ -115,13 +125,13 @@ def generate_inspiration() -> dict[str, list[str]]:
             inspiration_tags.ART_STYLE,
             1,
         ),
-        "rarely": (
+        "villan": (
             weighted_choices(
-                "rarely",
-                inspiration_tags.RARELY,
+                "villan",
+                inspiration_tags.VILLAN,
                 1,
             )
-            if include_rarely
+            if include_villan
             else []
         ),
     }
@@ -205,8 +215,8 @@ def build_scene_description(selections: dict[str, list[str]]) -> str:
     activities = format_tag_list(selections.get("activities", []))
     areas = format_tag_list(selections.get("areas", []))
     accessories = format_tag_list(selections.get("accessories", []))
-    rarely = format_tag_list(selections.get("rarely", []))
-    actor_bits = [bit for bit in (protagonist, rarely) if bit]
+    villan = format_tag_list(selections.get("villan", []))
+    actor_bits = [bit for bit in (protagonist, villan) if bit]
     parts = []
     if actor_bits:
         parts.append(" and ".join(actor_bits))

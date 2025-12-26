@@ -255,6 +255,21 @@ def save_inspiration_image(image_path: str) -> None:
     copy2(source_path, destination_path)
 
 
+def list_inspiration_images(limit: int = 12) -> list[str]:
+    if not os.path.isdir(INSPIRATION_DIR):
+        return []
+    files = [
+        filename
+        for filename in os.listdir(INSPIRATION_DIR)
+        if filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+    ]
+    files.sort(
+        key=lambda filename: os.path.getmtime(os.path.join(INSPIRATION_DIR, filename)),
+        reverse=True,
+    )
+    return [f"inspiration_images/{filename}" for filename in files[:limit]]
+
+
 init_db()
 
 
@@ -264,17 +279,43 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/generate", methods=["POST"])
+@app.route("/wait")
+# Render a waiting experience while the image is generated.
+def wait():
+    inspiration_images = list_inspiration_images()
+    return render_template("wait.html", inspiration_images=inspiration_images)
+
+
+@app.route("/generate_async", methods=["POST"])
 # Generate a fresh set of picks and request the corresponding image.
-def generate():
+def generate_async():
     selections = generate_inspiration()
     try:
         image_path = generate_image(selections)
     except RuntimeError as exc:
-        return render_template("image.html", error=str(exc), selections=selections)
+        session["last_error"] = str(exc)
+        session.pop("last_image", None)
+        session["last_selection"] = selections
+        return {"status": "error", "message": str(exc)}
     session["last_selection"] = selections
     session["last_image"] = image_path
-    return render_template("image.html", image_path=image_path, selections=selections)
+    session.pop("last_error", None)
+    return {"status": "ok"}
+
+
+@app.route("/image")
+def image():
+    error = session.get("last_error")
+    image_path = session.get("last_image")
+    selections = session.get("last_selection")
+    if not error and not image_path:
+        return redirect(url_for("index"))
+    return render_template(
+        "image.html",
+        error=error,
+        image_path=image_path,
+        selections=selections,
+    )
 
 
 @app.route("/rate", methods=["POST"])

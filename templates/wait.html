@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creating Your Smile</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Trebuchet MS", sans-serif;
+            background: linear-gradient(160deg, #fff1f7, #f3f8ff);
+            color: #2f2f2f;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .album {
+            width: min(1100px, 92vw);
+            padding: 32px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 24px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.12);
+        }
+        .header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .title {
+            font-size: 2rem;
+            margin: 0;
+        }
+        .subtitle {
+            margin: 6px 0 0;
+            color: #5d5d5d;
+        }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: #ffeef6;
+            border-radius: 999px;
+            font-weight: 600;
+            color: #d94176;
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f6b5ce;
+            border-top-color: #d94176;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+        }
+        .polaroid {
+            background: #fff;
+            border-radius: 16px;
+            padding: 14px 14px 24px;
+            box-shadow: 0 10px 18px rgba(0, 0, 0, 0.08);
+            transform: rotate(var(--angle));
+            transition: transform 0.2s ease;
+        }
+        .polaroid:hover {
+            transform: rotate(0deg) scale(1.02);
+        }
+        .polaroid img {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 12px;
+        }
+        .caption {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #7a7a7a;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            border: 2px dashed #f0c6d7;
+            border-radius: 20px;
+            background: #fff6fa;
+        }
+        .error-message {
+            margin-top: 16px;
+            color: #c0392b;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="album">
+        <div class="header">
+            <div>
+                <h1 class="title">Developing your next smile</h1>
+                <p class="subtitle">While we render, enjoy this little photo album of past smiles.</p>
+            </div>
+            <div class="status">
+                <span class="spinner"></span>
+                Creating magic...
+            </div>
+        </div>
+
+        {% if inspiration_images %}
+            <div class="grid">
+                {% for image in inspiration_images %}
+                    <div class="polaroid" style="--angle: {{ (loop.index0 % 5 - 2) * 2 }}deg;">
+                        <img src="{{ url_for('static', filename=image) }}" alt="Past smile memory">
+                        <div class="caption">Memory #{{ loop.index }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <h3>No past smiles yet</h3>
+                <p>Your first image will start the album. We are creating it now!</p>
+            </div>
+        {% endif %}
+        <div id="error-message" class="error-message" role="alert" aria-live="polite"></div>
+    </div>
+
+    <script>
+        async function requestSmile() {
+            const errorMessage = document.getElementById("error-message");
+            try {
+                const response = await fetch("{{ url_for('generate_async') }}", { method: "POST" });
+                const payload = await response.json();
+                if (payload.status === "ok") {
+                    window.location.href = "{{ url_for('image') }}";
+                    return;
+                }
+                errorMessage.textContent = payload.message || "Unable to generate a smile image.";
+                window.location.href = "{{ url_for('image') }}";
+            } catch (error) {
+                errorMessage.textContent = "Network hiccup. Please wait a moment and try again.";
+            }
+        }
+
+        requestSmile();
+    </script>
+</body>
+</html>

@@ -113,9 +113,9 @@
             </div>
         </div>
 
-        {% if inspiration_images %}
+        {% if album_images %}
             <div class="grid">
-                {% for image in inspiration_images %}
+                {% for image in album_images %}
                     <div class="polaroid" style="--angle: {{ (loop.index0 % 5 - 2) * 2 }}deg;">
                         <img src="{{ url_for('static', filename=image) }}" alt="Past smile memory">
                         <div class="caption">Memory #{{ loop.index }}</div>

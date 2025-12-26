@@ -33,14 +33,15 @@ CATEGORIES = {
 }
 
 
+# Open a database connection with row access by column name.
 def get_connection():
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     return connection
 
 
+# Ensure storage and metadata tables are ready for the app lifecycle.
 def init_db() -> None:
-    # Ensure storage and metadata tables are ready for the app lifecycle.
     os.makedirs(GENERATED_DIR, exist_ok=True)
     os.makedirs(INSPIRATION_DIR, exist_ok=True)
     with get_connection() as connection:
@@ -76,8 +77,8 @@ def init_db() -> None:
                 )
 
 
+# Use ratings as weights unless recognition is disabled in settings.
 def weighted_choice(category: str, options: list[str]) -> str:
-    # Use ratings as weights unless recognition is disabled in settings.
     if not settings.RECOGNIZE_RATINGS:
         return random.choice(options)
     with get_connection() as connection:
@@ -100,8 +101,8 @@ def weighted_choice(category: str, options: list[str]) -> str:
     return random.choices(names, weights=weights, k=1)[0]
 
 
+# Pick a themed set of inspiration tags for the prompt.
 def generate_inspiration() -> dict[str, str]:
-    # Pick a themed set of inspiration tags for the prompt.
     return {
         "actors": weighted_choice("actors", inspiration_tags.ACTORS),
         "activities": weighted_choice("activities", inspiration_tags.ACTIVITIES),
@@ -110,8 +111,8 @@ def generate_inspiration() -> dict[str, str]:
     }
 
 
+# Build the prompt and rely on the external image API for rendering.
 def generate_image(selections: dict[str, str]) -> str:
-    # Build the prompt and rely on the external image API for rendering.
     width, height = 900, 520
     image = generate_ai_image(selections, width, height)
 
@@ -122,8 +123,8 @@ def generate_image(selections: dict[str, str]) -> str:
     return f"generated/{filename}"
 
 
+# Send the final prompt to the OpenAI image generation API.
 def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Image.Image:
-    # Send the final prompt to the OpenAI image generation API.
     api_key = os.environ.get("SMILE_IMAGE_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("Missing SMILE_IMAGE_API_KEY or OPENAI_API_KEY for AI image generation.")
@@ -170,8 +171,8 @@ def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Im
         return ImageOps.fit(generated, (width, height), method=Image.LANCZOS)
 
 
+# Compose a consistent, detailed prompt for image generation.
 def build_prompt(selections: dict[str, str]) -> str:
-    # Compose a consistent, detailed prompt for image generation.
     actors = selections["actors"]
     activities = selections["activities"]
     areas = selections["areas"]
@@ -184,8 +185,8 @@ def build_prompt(selections: dict[str, str]) -> str:
     )
 
 
+# Keep highly rated images as inspiration inputs for later generations.
 def save_inspiration_image(image_path: str) -> None:
-    # Keep highly rated images as inspiration inputs for later generations.
     if not image_path:
         return
     source_path = os.path.join(APP_ROOT, "static", image_path)
@@ -200,13 +201,14 @@ init_db()
 
 
 @app.route("/")
+# Render the landing page with the primary call-to-action.
 def index():
     return render_template("index.html")
 
 
 @app.route("/generate", methods=["POST"])
+# Generate a fresh set of picks and request the corresponding image.
 def generate():
-    # Generate a fresh set of picks and request the corresponding image.
     selections = generate_inspiration()
     try:
         image_path = generate_image(selections)
@@ -218,8 +220,8 @@ def generate():
 
 
 @app.route("/rate", methods=["POST"])
+# Persist the rating and update aggregate scores for weighted choices.
 def rate():
-    # Persist the rating and update aggregate scores for weighted choices.
     rating_value = int(request.form.get("rating", "0"))
     selections = session.get("last_selection")
     image_path = session.get("last_image")

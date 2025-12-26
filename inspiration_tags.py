@@ -1,3 +1,4 @@
+#every 4th log entry
 ACTOR_PROTGONIST = [
     "Teen girl",
     "Teen girl blonde",
@@ -5,9 +6,9 @@ ACTOR_PROTGONIST = [
     "Teen girl with pajamas",
     "Teen girl jeans",
     "Teen girl with rings on",
-    "Stern faced middle aged woman",  # gail, suzie, susan, jeanine
     ]
 
+# one or more per prompt
 ACTOR_SUPPORTING = [
     "Cats",
     "Skunks",
@@ -29,9 +30,11 @@ ACTOR_SUPPORTING = [
     "Squirrel",
 ]
 
+# one or more per prompt
 ACTIVITIES = [
     "Vaping",
     "Sleeping",
+    "Skateboarding",
     "Falling down",
     "Slipping",
     "Laughing",
@@ -44,6 +47,7 @@ ACTIVITIES = [
     "Getting a Massage",
 ]
 
+# one per prompt
 AREAS = [
     "In a car",
     "In a bar",
@@ -56,6 +60,7 @@ AREAS = [
     "At an Movie Theater",
 ]
 
+# one or more per prompt
 ACCESSORIES = [
     "Cigarettes",
     "Knit hats",
@@ -71,7 +76,7 @@ ACCESSORIES = [
     "piled up laundry",
 ]
 
-
+# one per prompt
 ART_STYLE = [
     "low detail sketch",
     "high detail sketch",
@@ -81,4 +86,9 @@ ART_STYLE = [
     "low detail Painterly cartoon",
     "mid detail Painterly cartoon",
     "high detail Painterly cartoon",
+]
+
+# every 10th log entry
+RARELY= [
+    "Stern faced middle aged woman long hair",  # gail, suzie, susan, jeanine
 ]

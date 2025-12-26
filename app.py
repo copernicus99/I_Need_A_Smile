@@ -114,7 +114,7 @@ def generate_ai_image(selections: dict[str, list[str]], width: int, height: int)
 
     model = os.environ.get("SMILE_IMAGE_MODEL", "gpt-image-1")
     prompt = build_prompt(selections)
-    log_prompt(prompt)
+    log_prompt(selections)
     payload = {
         "model": model,
         "prompt": prompt,
@@ -166,26 +166,37 @@ def format_tag_list(tags: list[str]) -> str:
     return f"{', '.join(tags[:-1])}, and {tags[-1]}"
 
 
-def build_prompt(selections: dict[str, list[str]]) -> str:
+def build_scene_description(selections: dict[str, list[str]]) -> str:
     protagonist = format_tag_list(selections["actor_protagonist"])
     supporting = format_tag_list(selections["actor_supporting"])
     activities = format_tag_list(selections["activities"])
     areas = format_tag_list(selections["areas"])
     accessories = format_tag_list(selections["accessories"])
+    return f"{protagonist} with {supporting} {activities} {areas} with {accessories}."
+
+
+def build_prompt(selections: dict[str, list[str]]) -> str:
     art_style = format_tag_list(selections["art_style"])
+    scene_description = build_scene_description(selections)
     return (
         "Create a whimsical, joyful illustration intended to elicit laughter from viewer. "
-        f"Scene: {protagonist} with {supporting} {activities} {areas} with {accessories}. "
+        f"Scene: {scene_description} "
         "Include dynamic action and strong character expressions. "
         "Ensure the scene clearly shows the actors (main and supporting), activity, area, accessory "
         "and is rendered in the specified style. "
-        f"Render in a {art_style} style with a warm, whimsical palette."
+        f"Render in a {art_style} style."
     )
 
 
-def log_prompt(prompt: str) -> None:
+def log_prompt(selections: dict[str, list[str]]) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    entry = f"{timestamp} | {prompt}\n"
+    art_style = format_tag_list(selections["art_style"])
+    scene_description = build_scene_description(selections)
+    entry = (
+        f"{timestamp} |\n"
+        f"Scene: {scene_description}\n"
+        f"Render in a {art_style} style\n\n"
+    )
     with open(PROMPT_LOG_PATH, "a", encoding="utf-8") as log_file:
         log_file.write(entry)
 

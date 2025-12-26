@@ -1,0 +1,1 @@
+RECOGNIZE_RATINGS = True

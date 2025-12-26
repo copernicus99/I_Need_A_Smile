@@ -2,11 +2,9 @@ import base64
 import json
 import os
 import random
-import sqlite3
 import uuid
 import urllib.error
 import urllib.request
-from datetime import datetime
 from datetime import datetime
 from io import BytesIO
 from shutil import copy2
@@ -15,13 +13,10 @@ from flask import Flask, redirect, render_template, request, session, url_for
 from PIL import Image, ImageOps
 
 import inspiration_tags
-import settings
-
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROMPT_LOG_PATH = os.path.join(APP_ROOT, "prompt_log.txt")
-DB_PATH = os.path.join(APP_ROOT, "smiles.db")
 GENERATED_DIR = os.path.join(APP_ROOT, "static", "generated")
-INSPIRATION_DIR = os.path.join(APP_ROOT, "static", "inspiration_images")
+ALBUM_DIR = os.path.join(APP_ROOT, "static", "album_images")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SMILE_SECRET", "smile-secret-key")
@@ -37,72 +32,14 @@ CATEGORIES = {
 }
 
 
-# Open a database connection with row access by column name.
-def get_connection():
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
-# Ensure storage and metadata tables are ready for the app lifecycle.
-def init_db() -> None:
+# Ensure storage directories are ready for the app lifecycle.
+def init_storage() -> None:
     os.makedirs(GENERATED_DIR, exist_ok=True)
-    os.makedirs(INSPIRATION_DIR, exist_ok=True)
-    with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS items (
-                category TEXT NOT NULL,
-                name TEXT NOT NULL,
-                total_score INTEGER NOT NULL DEFAULT 0,
-                rating_count INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (category, name)
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS ratings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rating INTEGER NOT NULL,
-                selections TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        for category, options in CATEGORIES.items():
-            for option in options:
-                connection.execute(
-                    """
-                    INSERT OR IGNORE INTO items (category, name, total_score, rating_count)
-                    VALUES (?, ?, 0, 0)
-                    """,
-                    (category, option),
-                )
+    os.makedirs(ALBUM_DIR, exist_ok=True)
 
 
-# Use ratings as weights unless recognition is disabled in settings.
 def weighted_choice(category: str, options: list[str]) -> str:
-    if not settings.RECOGNIZE_RATINGS:
-        return random.choice(options)
-    with get_connection() as connection:
-        rows = connection.execute(
-            "SELECT name, total_score, rating_count FROM items WHERE category = ?",
-            (category,),
-        ).fetchall()
-    weights = []
-    names = []
-    row_map = {row["name"]: row for row in rows}
-    for option in options:
-        row = row_map.get(option)
-        if row and row["rating_count"] > 0:
-            average = row["total_score"] / row["rating_count"]
-        else:
-            average = 0
-        weight = 1 + average
-        names.append(option)
-        weights.append(weight)
-    return random.choices(names, weights=weights, k=1)[0]
+    return random.choice(options)
 
 
 def weighted_choices(category: str, options: list[str], count: int) -> list[str]:
@@ -253,34 +190,34 @@ def log_prompt(prompt: str) -> None:
         log_file.write(entry)
 
 
-# Keep highly rated images as inspiration inputs for later generations.
-def save_inspiration_image(image_path: str) -> None:
+# Keep saved images as album inputs for later generations.
+def save_album_image(image_path: str) -> None:
     if not image_path:
         return
     source_path = os.path.join(APP_ROOT, "static", image_path)
     if not os.path.exists(source_path):
         return
-    inspiration_name = f"inspiration_{uuid.uuid4().hex}.png"
-    destination_path = os.path.join(INSPIRATION_DIR, inspiration_name)
+    album_name = f"album_{uuid.uuid4().hex}.png"
+    destination_path = os.path.join(ALBUM_DIR, album_name)
     copy2(source_path, destination_path)
 
 
-def list_inspiration_images(limit: int = 12) -> list[str]:
-    if not os.path.isdir(INSPIRATION_DIR):
+def list_album_images(limit: int = 12) -> list[str]:
+    if not os.path.isdir(ALBUM_DIR):
         return []
     files = [
         filename
-        for filename in os.listdir(INSPIRATION_DIR)
+        for filename in os.listdir(ALBUM_DIR)
         if filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
     ]
     files.sort(
-        key=lambda filename: os.path.getmtime(os.path.join(INSPIRATION_DIR, filename)),
+        key=lambda filename: os.path.getmtime(os.path.join(ALBUM_DIR, filename)),
         reverse=True,
     )
-    return [f"inspiration_images/{filename}" for filename in files[:limit]]
+    return [f"album_images/{filename}" for filename in files[:limit]]
 
 
-init_db()
+init_storage()
 
 
 @app.route("/")
@@ -292,8 +229,8 @@ def index():
 @app.route("/wait")
 # Render a waiting experience while the image is generated.
 def wait():
-    inspiration_images = list_inspiration_images()
-    return render_template("wait.html", inspiration_images=inspiration_images)
+    album_images = list_album_images()
+    return render_template("wait.html", album_images=album_images)
 
 
 @app.route("/generate_async", methods=["POST"])
@@ -328,41 +265,17 @@ def image():
     )
 
 
-@app.route("/rate", methods=["POST"])
-# Persist the rating and update aggregate scores for weighted choices.
-def rate():
-    rating_value = int(request.form.get("rating", "0"))
-    selections = session.get("last_selection")
+@app.route("/album", methods=["POST"])
+# Save the current image into the album.
+def album():
     image_path = session.get("last_image")
-    if not selections or rating_value not in range(1, 6):
+    if not image_path:
         return redirect(url_for("index"))
-
-    created_at = datetime.utcnow().isoformat()
-    with get_connection() as connection:
-        connection.execute(
-            "INSERT INTO ratings (rating, selections, created_at) VALUES (?, ?, ?)",
-            (rating_value, json.dumps(selections), created_at),
-        )
-        for category, items in selections.items():
-            for item in items:
-                connection.execute(
-                    """
-                    UPDATE items
-                    SET total_score = total_score + ?,
-                        rating_count = rating_count + 1
-                    WHERE category = ? AND name = ?
-                    """,
-                    (rating_value, category, item),
-                )
-
-    if rating_value == 5:
-        save_inspiration_image(image_path)
-
-    session.pop("last_selection", None)
+    save_album_image(image_path)
     session.pop("last_image", None)
     return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
-    init_db()
+    init_storage()
     app.run(host="0.0.0.0", port=5000, debug=True)

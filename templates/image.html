@@ -32,6 +32,9 @@
             justify-content: center;
             gap: 12px;
         }
+        .buttons form {
+            margin: 0;
+        }
         .small-button {
             padding: 8px 18px;
             border-radius: 999px;
@@ -43,40 +46,6 @@
         }
         .small-button.home {
             background: #ff9f1c;
-        }
-        .modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-content {
-            background: #fff;
-            padding: 24px;
-            border-radius: 16px;
-            text-align: center;
-            width: min(90vw, 420px);
-        }
-        .faces {
-            display: flex;
-            justify-content: space-between;
-            gap: 6px;
-            margin: 20px 0;
-        }
-        .face-button {
-            font-size: 2rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-        }
-        .close-button {
-            background: #e0e0e0;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 8px;
-            cursor: pointer;
         }
     </style>
 </head>
@@ -93,44 +62,11 @@
             <img src="{{ url_for('static', filename=image_path) }}" alt="Smile inspiration">
             <div class="buttons">
                 <a href="{{ url_for('index') }}"><button class="small-button home" type="button">home</button></a>
-                <button class="small-button" type="button" onclick="openModal()">rate</button>
+                <form action="{{ url_for('album') }}" method="POST">
+                    <button class="small-button" type="submit">add to album</button>
+                </form>
             </div>
         {% endif %}
     </div>
-
-    <div class="modal" id="rating-modal">
-        <div class="modal-content">
-            <h3>How much did this make you smile?</h3>
-            <div class="faces">
-                <button class="face-button" onclick="submitRating(1)" aria-label="Rate 1">😐</button>
-                <button class="face-button" onclick="submitRating(2)" aria-label="Rate 2">🙂</button>
-                <button class="face-button" onclick="submitRating(3)" aria-label="Rate 3">😊</button>
-                <button class="face-button" onclick="submitRating(4)" aria-label="Rate 4">😁</button>
-                <button class="face-button" onclick="submitRating(5)" aria-label="Rate 5">😄</button>
-            </div>
-            <button class="close-button" onclick="closeModal()">Cancel</button>
-        </div>
-    </div>
-
-    <form id="rating-form" action="{{ url_for('rate') }}" method="POST">
-        <input type="hidden" name="rating" id="rating-input" value="">
-    </form>
-
-    <script>
-        const modal = document.getElementById('rating-modal');
-
-        function openModal() {
-            modal.style.display = 'flex';
-        }
-
-        function closeModal() {
-            modal.style.display = 'none';
-        }
-
-        function submitRating(value) {
-            document.getElementById('rating-input').value = value;
-            document.getElementById('rating-form').submit();
-        }
-    </script>
 </body>
 </html>

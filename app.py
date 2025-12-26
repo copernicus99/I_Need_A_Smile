@@ -507,7 +507,6 @@ def generate_ai_image(selections: dict[str, str], width: int, height: int) -> Im
         "model": model,
         "prompt": prompt,
         "size": os.environ.get("SMILE_IMAGE_SIZE", "1024x1024"),
-        "response_format": "b64_json",
     }
     request_data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(

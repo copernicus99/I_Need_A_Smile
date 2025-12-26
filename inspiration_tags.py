@@ -1,4 +1,4 @@
-#every 4th log entry
+# Only ONE every 4th prompt submission (per log)
 ACTOR_PROTGONIST = [
     "Teen girl",
     "Teen girl blonde",
@@ -39,6 +39,7 @@ ACTIVITIES = [
     "Slipping",
     "Laughing",
     "Mischief",
+    "Sneaky",
     "Snowboarding",
     "Fishing",
     "Driving",
@@ -88,7 +89,9 @@ ART_STYLE = [
     "high detail Painterly cartoon",
 ]
 
-# every 10th log entry
-RARELY= [
-    "Stern faced middle aged woman long hair",  # gail, suzie, susan, jeanine
+# Only ONE ALONG WITH every 3rd ACTOR_PROTGONIST prompt submission (per log)
+VILLAN= [
+    "Stern faced middle aged woman long brown hair",  # jeanine
+    "Stern faced late aged woman short hair",  # gail OR susan
+    "Stern faced heavy set middle aged woman long hair",  # suzie
 ]

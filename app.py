@@ -293,6 +293,18 @@ def list_album_images(limit: int = 12) -> list[str]:
     return [f"album_images/{filename}" for filename in files[:limit]]
 
 
+def delete_album_image(image_path: str) -> None:
+    if not image_path:
+        return
+    filename = os.path.basename(image_path)
+    if not filename:
+        return
+    target_path = os.path.join(ALBUM_DIR, filename)
+    if not os.path.exists(target_path):
+        return
+    os.remove(target_path)
+
+
 init_storage()
 
 
@@ -357,6 +369,13 @@ def album():
     save_album_image(image_path)
     session.pop("last_image", None)
     return redirect(url_for("index"))
+
+
+@app.route("/album/remove", methods=["POST"])
+def remove_album_image():
+    image_path = request.form.get("image_path", "")
+    delete_album_image(image_path)
+    return redirect(url_for("wait"))
 
 
 if __name__ == "__main__":

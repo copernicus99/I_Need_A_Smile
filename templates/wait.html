@@ -136,18 +136,10 @@
             const errorMessage = document.getElementById("error-message");
             try {
                 const response = await fetch("{{ url_for('generate_async') }}", { method: "POST" });
-                let payload = {};
-                try {
-                    payload = await response.json();
-                } catch (parseError) {
-                    payload = { status: "error", message: "Unable to parse response from the server." };
-                }
+                const payload = await response.json();
                 if (payload.status === "ok") {
                     window.location.href = "{{ url_for('image') }}";
                     return;
-                }
-                if (!response.ok && !payload.message) {
-                    payload.message = "Unable to generate a smile image due to a server error.";
                 }
                 errorMessage.textContent = payload.message || "Unable to generate a smile image.";
                 window.location.href = "{{ url_for('image') }}";

@@ -57,7 +57,30 @@ This should show a command similar to:
 
 If Gunicorn is launched from a shell session (parent PID is a session scope),
 then it is **manual** and not guaranteed to survive reboot. If a systemd unit is
-used, it will show up in `systemctl status <PID>`.
+used, it will show up in `systemctl status <service>`.
+
+**Systemd service (recommended)**
+
+- Service name: `smile.service`
+- Unit file: `/etc/systemd/system/smile.service`
+- Environment file: `/etc/I_Need_A_Smile/env`
+
+Example unit configuration (trimmed):
+
+```
+[Service]
+WorkingDirectory=/opt/apps/I_Need_A_Smile
+EnvironmentFile=/etc/I_Need_A_Smile/env
+ExecStart=/opt/apps/I_Need_A_Smile/venv/bin/gunicorn --bind 127.0.0.1:8000 app:app --timeout 180
+```
+
+Common service commands:
+
+```bash
+systemctl status smile
+systemctl restart smile
+journalctl -u smile -n 200
+```
 
 ### Development
 
@@ -84,7 +107,8 @@ This runs Flask’s built-in dev server on port 5000.
 - `SMILE_IMAGE_MODEL` (default `gpt-image-1`)
 - `SMILE_IMAGE_SIZE` (default `1024x1024`)
 
-These are read directly in `app.py` when generating images.
+These are read directly in `app.py` when generating images. For systemd, keep
+the values in `/etc/I_Need_A_Smile/env` so restarts preserve them.
 
 ---
 
@@ -159,9 +183,13 @@ ProxyPassReverse / http://127.0.0.1:8000/
 **Logs**
 
 - Prompt history: `/opt/apps/I_Need_A_Smile/prompt_log.txt`
-- Gunicorn logs depend on launch flags (e.g., `--error-logfile`).
+- Gunicorn logs depend on launch flags (e.g., `--error-logfile`) or systemd/journal
+  when managed as a service.
+- Systemd service logs (if enabled): `journalctl -u smile`
 - Apache error log (cPanel): `/etc/apache2/logs/error_log`
 - Apache domain logs (cPanel): `/etc/apache2/logs/domlogs/`
+- Apache access log (cPanel/EasyApache): `/etc/apache2/logs/access_log`
+- cPanel traffic log (EasyApache): `/var/log/cpanel-server-traffic/web/traffic-apache.log`
 
 ---
 

@@ -306,21 +306,14 @@ def wait():
 @app.route("/generate_async", methods=["POST"])
 # Generate a fresh set of picks and request the corresponding image.
 def generate_async():
-    selections = {}
+    selections = generate_inspiration()
     try:
-        selections = generate_inspiration()
         image_path = generate_image(selections)
     except RuntimeError as exc:
         session["last_error"] = str(exc)
         session.pop("last_image", None)
         session["last_selection"] = selections
-        return {"status": "error", "message": str(exc)}, 500
-    except Exception as exc:
-        session["last_error"] = "Unexpected error while generating a smile image."
-        session.pop("last_image", None)
-        session["last_selection"] = selections
-        app.logger.exception("Unexpected error during image generation: %s", exc)
-        return {"status": "error", "message": session["last_error"]}, 500
+        return {"status": "error", "message": str(exc)}
     session["last_selection"] = selections
     session["last_image"] = image_path
     session.pop("last_error", None)

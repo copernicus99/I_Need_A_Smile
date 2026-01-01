@@ -195,7 +195,13 @@ def generate_ai_image(selections: dict[str, list[str]], width: int, height: int)
     raw_bytes = base64.b64decode(encoded)
     with Image.open(BytesIO(raw_bytes)) as generated:
         generated = generated.convert("RGB")
-        return ImageOps.fit(generated, (width, height), method=Image.LANCZOS)
+        return ImageOps.pad(
+            generated,
+            (width, height),
+            method=Image.LANCZOS,
+            color="#ffffff",
+            centering=(0.5, 0.5),
+        )
 
 
 # Compose a consistent, detailed prompt for image generation.

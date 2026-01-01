@@ -93,17 +93,55 @@ These are read directly in `app.py` when generating images.
 Because the app is proxied via the host web server, it may rely on host-level
 includes that live **outside** the app repo. Capture those here for onboarding.
 
-> **TODO: fill in the actual include locations on the host**
->
-> Add the exact file paths once confirmed on the server, for example:
-> - Apache/Nginx vhost include files
-> - cPanel include snippets
-> - Proxy or socket configuration pointing to the Gunicorn bind
->
-> Suggested places to check (server):
-> - `/etc/httpd/` (Apache)
-> - `/etc/apache2/` (Apache on Debian/Ubuntu)
-> - `/etc/nginx/` (Nginx)
+**Apache vhost discovery (cPanel host)**
+
+- Identify the active vhost definitions with:
+  ```bash
+  httpd -S
+  ```
+- On the current host, `httpd -S` reports `smile-emi.com` vhosts in:
+  - `/etc/apache2/conf/httpd.conf` (port 80)
+  - `/etc/apache2/conf/httpd.conf` (port 443)
+
+These vhost blocks include explicit includes for domain-specific overrides:
+
+- `/etc/apache2/conf.d/userdata/std/2_4/cpjsirwin/smile-emi.com/*.conf`
+- `/etc/apache2/conf.d/userdata/ssl/2_4/cpjsirwin/smile-emi.com/*.conf`
+
+On the current host, the domain include files are:
+
+- `/etc/apache2/conf.d/userdata/std/2_4/cpjsirwin/smile-emi.com/smile.conf`
+- `/etc/apache2/conf.d/userdata/ssl/2_4/cpjsirwin/smile-emi.com/smile.conf`
+
+Current proxy-related directives from `smile.conf` (example; verify both `std` and
+`ssl` include files):
+
+```apache
+ProxyPass /.well-known/acme-challenge/ !
+ProxyPass / unix:/opt/apps/I_Need_A_Smile/run/gunicorn.sock|http://localhost/
+ProxyPassReverse / unix:/opt/apps/I_Need_A_Smile/run/gunicorn.sock|http://localhost/
+```
+
+When troubleshooting 503s, confirm the proxy target matches the running
+Gunicorn bind. The current Gunicorn process is bound to `127.0.0.1:8000` (TCP),
+while Apache is configured to use a Unix socket at
+`/opt/apps/I_Need_A_Smile/run/gunicorn.sock`. If the socket file is missing, the
+proxy will return 503.
+
+If Gunicorn is bound to TCP, update both `std` and `ssl` include files to use:
+
+```apache
+ProxyPass /.well-known/acme-challenge/ !
+ProxyPass / http://127.0.0.1:8000/
+ProxyPassReverse / http://127.0.0.1:8000/
+```
+
+**Other common include locations**
+
+- `/etc/apache2/conf.d/`
+- `/etc/apache2/conf.d/includes/`
+- `/etc/httpd/` (Apache on RHEL/CentOS)
+- `/etc/nginx/` (if Nginx is used instead of Apache)
 
 ---
 
@@ -122,6 +160,8 @@ includes that live **outside** the app repo. Capture those here for onboarding.
 
 - Prompt history: `/opt/apps/I_Need_A_Smile/prompt_log.txt`
 - Gunicorn logs depend on launch flags (e.g., `--error-logfile`).
+- Apache error log (cPanel): `/etc/apache2/logs/error_log`
+- Apache domain logs (cPanel): `/etc/apache2/logs/domlogs/`
 
 ---
 
@@ -138,4 +178,3 @@ Check that the app responds locally (if bound to 127.0.0.1:8000):
 ```bash
 curl -i -X POST http://127.0.0.1:8000/generate_async
 ```
-

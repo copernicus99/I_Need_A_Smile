@@ -71,6 +71,7 @@
             box-shadow: 0 10px 18px rgba(0, 0, 0, 0.08);
             transform: rotate(var(--angle));
             transition: transform 0.2s ease;
+            position: relative;
         }
         .polaroid:hover {
             transform: rotate(0deg) scale(1.02);
@@ -81,6 +82,38 @@
             object-fit: contain;
             background: #f8f8ff;
             border-radius: 12px;
+            display: block;
+        }
+        .thumbnail {
+            position: relative;
+        }
+        .remove-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid currentColor;
+            background: rgba(255, 255, 255, 0.7);
+            color: #1f1f1f;
+            font-size: 18px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+        }
+        .remove-button.is-light {
+            color: #fff;
+            border-color: #fff;
+            background: rgba(0, 0, 0, 0.45);
+        }
+        .remove-button:focus-visible {
+            outline: 2px solid #1f6feb;
+            outline-offset: 2px;
         }
         .caption {
             margin-top: 10px;
@@ -118,7 +151,15 @@
             <div class="grid">
                 {% for image in album_images %}
                     <div class="polaroid" style="--angle: {{ (loop.index0 % 5 - 2) * 2 }}deg;">
-                        <img src="{{ url_for('static', filename=image) }}" alt="Past smile memory">
+                        <div class="thumbnail">
+                            <img src="{{ url_for('static', filename=image) }}" alt="Past smile memory" loading="lazy">
+                            <form action="{{ url_for('remove_album_image') }}" method="POST">
+                                <input type="hidden" name="image_path" value="{{ image }}">
+                                <button class="remove-button" type="submit" aria-label="Remove from album">
+                                    &times;
+                                </button>
+                            </form>
+                        </div>
                         <div class="caption">Memory #{{ loop.index }}</div>
                     </div>
                 {% endfor %}
@@ -133,6 +174,46 @@
     </div>
 
     <script>
+        function setRemoveButtonContrast(image, button) {
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+            if (!context) {
+                return;
+            }
+            const sampleSize = 24;
+            canvas.width = sampleSize;
+            canvas.height = sampleSize;
+            context.drawImage(image, 0, 0, sampleSize, sampleSize);
+            const { data } = context.getImageData(0, 0, sampleSize, sampleSize);
+            let total = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                total += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            }
+            const average = total / (data.length / 4);
+            if (average < 140) {
+                button.classList.add("is-light");
+            }
+        }
+
+        function initializeRemoveButtons() {
+            const thumbnails = document.querySelectorAll(".thumbnail");
+            thumbnails.forEach((thumbnail) => {
+                const image = thumbnail.querySelector("img");
+                const button = thumbnail.querySelector(".remove-button");
+                if (!image || !button) {
+                    return;
+                }
+                if (image.complete) {
+                    setRemoveButtonContrast(image, button);
+                } else {
+                    image.addEventListener("load", () => setRemoveButtonContrast(image, button));
+                }
+            });
+        }
+
         async function requestSmile() {
             const errorMessage = document.getElementById("error-message");
             try {
@@ -157,6 +238,7 @@
             }
         }
 
+        initializeRemoveButtons();
         requestSmile();
     </script>
 </body>

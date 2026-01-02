@@ -1,3 +1,10 @@
+# Only ONE ALONG WITH every 3rd ACTOR_PROTGONIST prompt submission (per log)
+VILLAN= [
+    "Stern faced middle aged woman long brown hair",  # jeanine
+    "Stern faced late aged woman short hair",  # gail OR susan
+    "Stern faced middle aged woman long blonde hair heavy set",  # suzie
+]
+
 # Only ONE every 4th prompt submission (per log)
 ACTOR_PROTGONIST = [
     "Teen girl",
@@ -6,19 +13,24 @@ ACTOR_PROTGONIST = [
     "Teen girl with pajamas",
     "Teen girl jeans",
     "Teen girl with rings on",
-    ]
+    "Teen girl with vaping",
+]
 
 # one or more per prompt
 ACTOR_SUPPORTING = [
+    # plural
     "Cats",
     "Skunks",
+    "Defensive Skunks",
     "Possums",
+    "Possums growling",
     "Dirty Kittens",
     "Racoons",
     "Chickens",
     "Owls",
     "Groundhogs",
     "Squirrels",
+    # singular
     "Cat",
     "Skunk",
     "Possum",
@@ -32,7 +44,6 @@ ACTOR_SUPPORTING = [
 
 # one or more per prompt
 ACTIVITIES = [
-    "Vaping",
     "Sleeping",
     "Skateboarding",
     "Falling down",
@@ -46,52 +57,53 @@ ACTIVITIES = [
     "Shopping",
     "Swimming",
     "Getting a Massage",
-]
-
-# one per prompt
-AREAS = [
-    "In a car",
-    "In a bar",
-    "At the beach",
-    "In a Wawa",
-    "At a Dunkin Donuts drive though",
-    "At a rock concert",
-    "At an Applebee's",
-    "At an Theme park",
-    "At an Movie Theater",
+    "Drinking coffee",
+    "Eating candies",
+    "Party",
+    "Door Dash",
+    "Feeding kittens",
+    "Talking on phone",
+    "Looking at phone",
+    "Go Karting",
 ]
 
 # one or more per prompt
 ACCESSORIES = [
     "Cigarettes",
-    "Knit hats",
     "Muck boots",
     "Mushrooms",
     "Guns",
     "Cat exercise wheel",
     "Knit hat",
     "Animal carrier",
-    "volkswagen logo",
-    "disorganization",
-    "piled up dishes",
-    "piled up laundry",
+    "Volkswagen Passat",
+    "Blanket",
+    "Dirty dishes",
+    "Mixed Drinks",
+]
+
+# one per prompt
+AREAS = [
+    "On a motorcycle",
+    "In a car",
+    "in the woods",
+    "In a bar",
+    "At the beach",
+    "At a Wawa",
+    "At a Dunkin Donuts",
+    "At a drive though window",
+    "At a rock concert",
+    "At an Applebee's",
+    "At a Theme park",
+    "At an animal clinic",
 ]
 
 # one per prompt
 ART_STYLE = [
-    "low detail sketch",
     "high detail sketch",
-    "low detail cartoon",
-    "mid detail cartoon",
     "high detail cartoon",
-    "low detail Painterly cartoon",
-    "mid detail Painterly cartoon",
     "high detail Painterly cartoon",
-]
-
-# Only ONE ALONG WITH every 3rd ACTOR_PROTGONIST prompt submission (per log)
-VILLAN= [
-    "Stern faced middle aged woman long brown hair",  # jeanine
-    "Stern faced late aged woman short hair",  # gail OR susan
-    "Stern faced heavy set middle aged woman long hair",  # suzie
+    "Real life photo quality",
+    "high saturation",
+    "cool color scheme",
 ]

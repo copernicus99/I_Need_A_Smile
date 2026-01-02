@@ -148,12 +148,12 @@
         </div>
 
         {% if album_images %}
-            <div class="grid">
+            <div class="grid" id="album-grid">
                 {% for image in album_images %}
                     <div class="polaroid" style="--angle: {{ (loop.index0 % 5 - 2) * 2 }}deg;">
                         <div class="thumbnail">
                             <img src="{{ url_for('static', filename=image) }}" alt="Past smile memory" loading="lazy">
-                            <form action="{{ url_for('remove_album_image') }}" method="POST">
+                            <form class="remove-form" action="{{ url_for('remove_album_image') }}" method="POST">
                                 <input type="hidden" name="image_path" value="{{ image }}">
                                 <button class="remove-button" type="submit" aria-label="Remove from album">
                                     &times;
@@ -164,12 +164,15 @@
                     </div>
                 {% endfor %}
             </div>
-        {% else %}
-            <div class="empty-state">
-                <h3>No past smiles yet</h3>
-                <p>Your first image will start the album. We are creating it now!</p>
-            </div>
         {% endif %}
+        <div
+            id="empty-state"
+            class="empty-state"
+            {% if album_images %}hidden{% endif %}
+        >
+            <h3>No past smiles yet</h3>
+            <p>Your first image will start the album. We are creating it now!</p>
+        </div>
         <div id="error-message" class="error-message" role="alert" aria-live="polite"></div>
     </div>
 
@@ -238,7 +241,48 @@
             }
         }
 
+        function initializeRemoveFormHandlers() {
+            const errorMessage = document.getElementById("error-message");
+            const emptyState = document.getElementById("empty-state");
+            document.querySelectorAll(".remove-form").forEach((form) => {
+                form.addEventListener("submit", async (event) => {
+                    event.preventDefault();
+                    const button = form.querySelector(".remove-button");
+                    if (button) {
+                        button.disabled = true;
+                    }
+                    try {
+                        const response = await fetch(form.action, {
+                            method: "POST",
+                            headers: { Accept: "application/json" },
+                            body: new FormData(form),
+                        });
+                        if (!response.ok) {
+                            throw new Error("Unable to remove image.");
+                        }
+                        const card = form.closest(".polaroid");
+                        if (card) {
+                            card.remove();
+                        }
+                        if (!document.querySelector(".polaroid") && emptyState) {
+                            const grid = document.getElementById("album-grid");
+                            if (grid) {
+                                grid.remove();
+                            }
+                            emptyState.hidden = false;
+                        }
+                    } catch (error) {
+                        errorMessage.textContent = "Unable to remove that image right now.";
+                        if (button) {
+                            button.disabled = false;
+                        }
+                    }
+                });
+            });
+        }
+
         initializeRemoveButtons();
+        initializeRemoveFormHandlers();
         requestSmile();
     </script>
 </body>

@@ -375,6 +375,8 @@ def album():
 def remove_album_image():
     image_path = request.form.get("image_path", "")
     delete_album_image(image_path)
+    if request.accept_mimetypes.best == "application/json":
+        return {"status": "ok"}
     return redirect(url_for("wait"))
 
 

@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import random
+import time
 import uuid
 import urllib.error
 import urllib.request
@@ -325,19 +326,49 @@ def wait():
 # Generate a fresh set of picks and request the corresponding image.
 def generate_async():
     selections = {}
+    request_started = time.perf_counter()
+    app.logger.info("generate_async started")
     try:
+        inspiration_started = time.perf_counter()
         selections = generate_inspiration()
+        inspiration_elapsed_ms = (time.perf_counter() - inspiration_started) * 1000
+        selection_counts = {key: len(value) for key, value in selections.items()}
+        app.logger.info(
+            "generate_async inspiration ready duration_ms=%.0f selections=%s",
+            inspiration_elapsed_ms,
+            selection_counts,
+        )
+        generation_started = time.perf_counter()
         image_path = generate_image(selections)
+        generation_elapsed_ms = (time.perf_counter() - generation_started) * 1000
+        total_elapsed_ms = (time.perf_counter() - request_started) * 1000
+        app.logger.info(
+            "generate_async image ready duration_ms=%.0f total_ms=%.0f image_path=%s",
+            generation_elapsed_ms,
+            total_elapsed_ms,
+            image_path,
+        )
     except RuntimeError as exc:
+        total_elapsed_ms = (time.perf_counter() - request_started) * 1000
+        app.logger.warning(
+            "generate_async runtime error total_ms=%.0f error=%s",
+            total_elapsed_ms,
+            exc,
+        )
         session["last_error"] = str(exc)
         session.pop("last_image", None)
         session["last_selection"] = selections
         return {"status": "error", "message": str(exc)}, 500
     except Exception as exc:
+        total_elapsed_ms = (time.perf_counter() - request_started) * 1000
         session["last_error"] = "Unexpected error while generating a smile image."
         session.pop("last_image", None)
         session["last_selection"] = selections
-        app.logger.exception("Unexpected error during image generation: %s", exc)
+        app.logger.exception(
+            "Unexpected error during image generation total_ms=%.0f: %s",
+            total_elapsed_ms,
+            exc,
+        )
         return {"status": "error", "message": session["last_error"]}, 500
     session["last_selection"] = selections
     session["last_image"] = image_path

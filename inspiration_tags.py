@@ -65,11 +65,12 @@ ACTIVITIES = [
     "Talking on phone",
     "Looking at phone",
     "Go Karting",
+    "Farting",
 ]
 
 # one or more per prompt
 ACCESSORIES = [
-    "Cigarettes",
+    "Marijuana",
     "Muck boots",
     "Mushrooms",
     "Guns",
